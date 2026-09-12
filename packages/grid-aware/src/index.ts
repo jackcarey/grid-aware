@@ -1,20 +1,31 @@
 import type { components } from "./client.gen.js";
 import { createGridAwareClient } from "./client.js";
 
+/** `/v1/intensity` API response. */
 export type GridIntensityData = components["schemas"]["GridIntensityResponse"];
 
 export interface GridAwareOptions {
+  /** Your worker's URL. Required. */
   apiBaseUrl: string;
+  /** Electricity Maps zone code, e.g. `"FR"`. Skip it to auto-detect the visitor's location. */
   zone?: string;
+  /** UK postcode, e.g. `"SW1A"`. Wins over `zone` if both are set. */
   postcode?: string;
+  /** UK DNO region ID (1-14) */
   regionid?: number;
+  /** Turns the response into the `data-grid-aware` value. Default: just use the band ("low", "medium", "high"). */
   mapBand?: (data: GridIntensityData) => string;
+  /** How long to reuse a fetched result, in ms. `0` = always fetch fresh. Default: 30 minutes. */
   maxAgeMs?: number;
+  /** Auto-refresh on a timer? Default: yes. */
   autoRefresh?: boolean;
 }
 
+/** {@link initGridAware}. */
 export interface GridAwareHandle {
+  /** Fetch again (or reuse cache) and update the page right now. */
   refresh(): Promise<void>;
+  /** Stop the auto-refresh timer. */
   stop(): void;
 }
 
@@ -35,19 +46,25 @@ function unknownIntensityData(): GridIntensityData {
   };
 }
 
+/** Same as {@link GridAwareOptions}, but no caching options */
 export interface GridAwareBlockingOptions {
+  /** Your worker's URL. Required. */
   apiBaseUrl: string;
+  /** Electricity Maps zone code, e.g. `"FR"`. Skip it to auto-detect the visitor's location. */
   zone?: string;
+  /** UK postcode, e.g. `"SW1A"`. Wins over `zone` if both are set. */
   postcode?: string;
+  /** UK DNO region ID (1-14) */
   regionid?: number;
+  /** Turns the response into your `data-grid-aware` value. Default: just use the band ("low", "high", etc). */
   mapBand?: (data: GridIntensityData) => string;
 }
 
 /**
- * Fetches synchronously so `data-grid-aware` is set
- * before first paint, with no flash of unstyled/default content. The first load costs a full
- * network round-trip on the main thread on every page load - only use this
- * for a script placed early in `<head>`, not the default async `initGridAware`.
+ * Sets `data-grid-aware` before the page paints. No flash of default styling but it
+ * blocks the page load with a real network request. No caching.
+ *
+ * Only use this in an early `<head>` script. Otherwise use {@link initGridAware}.
  */
 export function initGridAwareBlocking(options: GridAwareBlockingOptions): void {
   if (!options.apiBaseUrl) {
@@ -85,6 +102,12 @@ export function initGridAwareBlocking(options: GridAwareBlockingOptions): void {
   document.documentElement.dataset.gridAware = band;
 }
 
+/**
+ * Sets `data-grid-aware` and keeps it updated.
+ *
+ * Never throws for a bad fetch - it just shows "unknown" instead. Call `.stop()`
+ * on the returned handle when you're done (e.g. unmounting a component).
+ */
 export function initGridAware(options: GridAwareOptions): GridAwareHandle {
   if (!options.apiBaseUrl) {
     throw new Error("grid-aware: apiBaseUrl is required");
@@ -92,8 +115,6 @@ export function initGridAware(options: GridAwareOptions): GridAwareHandle {
 
   const client = createGridAwareClient(options.apiBaseUrl);
 
-  // How long a fetched response is reused before refresh() fetches again. 0 means
-  // always fetch fresh. Independent of whether there's a recurring autoRefresh timer
   const maxAgeMs = options.maxAgeMs ?? DEFAULT_MAX_AGE_MS;
   const autoRefresh = options.autoRefresh ?? true;
 
