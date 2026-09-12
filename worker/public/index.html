@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>grid-aware</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%A1%3C%2Ftext%3E%3C%2Fsvg%3E">
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 60rem; margin: 2rem auto; padding: 0 1rem; color: #111; background: #fff; }
+  code, pre { background: #f2f2f2; padding: 0.15rem 0.35rem; border-radius: 4px; font-size: 0.9em; }
+  pre { padding: 1rem; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; }
+  th, td { text-align: left; border-bottom: 1px solid #ddd; padding: 0.4rem 0.6rem; font-size: 0.9em; vertical-align: top; }
+  td pre { margin: 0.5rem 0 0; white-space: pre-wrap; }
+  section { margin-bottom: 2.5rem; }
+  footer { margin-top: 3rem; font-size: 0.85em; color: #555; border-top: 1px solid #ddd; padding-top: 1rem; }
+  a { color: #0a5; }
+  #live-intensity { display: inline-block; padding: 0.3rem 0.8rem; border-radius: 999px; background: #eee; }
+  html[data-grid-aware="low"] #live-intensity { background: #d4f7d4; }
+  html[data-grid-aware="moderate"] #live-intensity { background: #fff3c4; }
+  html[data-grid-aware="high"] #live-intensity { background: #ffd8b0; }
+  html[data-grid-aware="very-high"] #live-intensity { background: #ffb3b3; }
+</style>
+</head>
+<body>
+  <a href="https://jackcarey.co.uk" title="back to jackcarey.co.uk">&lt; main site</a>
+  <main>
+<h1>grid-aware</h1>
+<p>
+  A small API that combines <a href="https://electricitymaps.com">Electricity Maps</a>
+  (global grid carbon intensity, per zone) with the UK
+  <a href="https://carbonintensity.org.uk">NESO Carbon Intensity API</a> (free, GB-only, but
+  regionally granular down to postcode/DNO region) behind one normalized endpoint.
+  NESO is only ever queried for requests originating in the UK; everything else is served
+  via Electricity Maps.
+</p>
+<p>
+  <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">Get in touch</a> with questions or feedback.
+</p>
+
+<p id="live-intensity">Current grid intensity: <strong id="live-intensity-value">loading&hellip;</strong></p>
+<script type="module">
+  import { initGridAware } from "/grid-aware/index.js";
+  const valueEl = document.getElementById("live-intensity-value");
+  initGridAware({
+    apiBaseUrl: location.origin,
+    // No zone given - the worker defaults to the visitor's Cloudflare-detected location (though any location signals from the server host could be passed in)
+    // (UK postcode where available, else just their country).
+    mapBand: (data) => {
+      const where = data.location.region.name ?? data.location.zone ?? "your area";
+      valueEl.textContent = where + ": " + data.carbonIntensity.value + " gCO2eq/kWh (" + data.carbonIntensity.band + ")";
+      return data.carbonIntensity.band;
+    },
+  });
+
+  // Static HTML can't know this deployment's own URL ahead of time.
+  for (const el of document.querySelectorAll(".this-worker-url")) {
+    el.textContent = location.origin;
+  }
+</script>
+
+<h2>Try it</h2>
+<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?zone=FR' \
+  -H 'Origin: https://your-allowed-site.example'</pre>
+<p>
+  Data endpoints (<code>/v1/*</code>) require the calling origin to be on this deployment's
+  allowlist - see the <a href="#api-reference">API reference</a> below for the full contract.
+</p>
+
+<h2>Use it on a page</h2>
+<p>
+  The <a href="https://jsr.io/@web-components/grid-aware">@web-components/grid-aware</a> package
+  sets a <code>data-grid-aware</code> attribute on <code>&lt;html&gt;</code> reflecting the
+  current intensity band, which your CSS and scripts can respond to:
+</p>
+<pre>&lt;script type="module"
+        src="https://esm.sh/jsr/@web-components/grid-aware/browser"
+        data-api-base-url="<span class="this-worker-url">https://your-deployed-url.com</span>"&gt;&lt;/script&gt;
+
+&lt;style&gt;
+  html[data-grid-aware="high"] video { display: none; }
+&lt;/style&gt;</pre>
+<p>
+  That script tag is a JS module, so it's deferred by the browser - the band gets applied
+  after the page has already started rendering, which can flash the default styling for a
+  moment. To avoid that, a plain (non-module) blocking build is available too: placed early
+  in <code>&lt;head&gt;</code>, it fetches synchronously and sets <code>data-grid-aware</code>
+  before the rest of the page paints, at the cost of stalling the page load on that request:
+</p>
+<pre>&lt;script src="<span class="this-worker-url">https://your-deployed-url.com</span>/grid-aware/blocking.js"
+        data-api-base-url="<span class="this-worker-url">https://your-deployed-url.com</span>"&gt;&lt;/script&gt;</pre>
+
+<h2 id="api-reference">API reference <small>v1.0.0</small></h2>
+<p>Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API.</p>
+<p>Raw spec: <a href="/openapi.json">/openapi.json</a></p>
+
+<section>
+  <h3><code>GET /v1/intensity</code></h3>
+  <p>Get combined grid carbon intensity</p>
+  <p>Routes to NESO for GB national/regional subjects (UK-origin requests only) and to Electricity Maps for everything else. With no zone/postcode/regionid at all, defaults to the caller's own Cloudflare-detected location - a UK postcode where available, else just the caller's country.</p>
+  <h4>Parameters</h4>
+  <table>
+<thead><tr><th>Name</th><th>In</th><th>Required</th><th>Type</th><th>Default</th></tr></thead>
+<tbody><tr><td><code>zone</code></td><td>query</td><td>no</td><td><code>string</code></td><td></td></tr>
+<tr><td><code>postcode</code></td><td>query</td><td>no</td><td><code>string</code></td><td></td></tr>
+<tr><td><code>regionid</code></td><td>query</td><td>no</td><td><code>integer</code></td><td></td></tr>
+<tr><td><code>horizon</code></td><td>query</td><td>no</td><td><code>latest | 24h | 48h</code></td><td>latest</td></tr>
+<tr><td><code>source</code></td><td>query</td><td>no</td><td><code>auto | electricitymaps | neso</code></td><td>auto</td></tr></tbody>
+</table>
+  <h4>Responses</h4>
+  <h4><code>200</code> - Normalized grid carbon intensity for the requested location</h4>
+<pre>{
+  source: "electricitymaps" | "neso"
+  location: {
+    zone: string
+    region: {
+      id?: number
+      name?: string
+      nation?: "England" | "Scotland" | "Wales"
+      unknown: boolean
+    }
+  }
+  datetime: string
+  validTo?: string
+  carbonIntensity: {
+    value: number
+    unit: "gCO2eq/kWh"
+    type: "actual" | "forecast" | "estimated" | "unknown"
+    band: "low" | "moderate" | "high" | "very-high" | "unknown"
+  }
+  generationMix?: {
+    fuel: string
+    percentage: number
+  }[]
+  fallback?: {
+    reason: string
+  }
+}</pre>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody><tr><td><code>source</code></td><td><pre>"electricitymaps" | "neso"</pre></td><td>Which upstream actually answered this request.</td></tr>
+<tr><td><code>location</code></td><td><pre>{
+  zone: string
+  region: {
+    id?: number
+    name?: string
+    nation?: "England" | "Scotland" | "Wales"
+    unknown: boolean
+  }
+}</pre></td><td>Echoes back what this response is about, so you never have to re-parse the request.</td></tr>
+<tr><td><code>location.zone</code></td><td><pre>string</pre></td><td>Electricity Maps zone code (always "GB" for NESO responses).</td></tr>
+<tr><td><code>location.region</code></td><td><pre>{
+  id?: number
+  name?: string
+  nation?: "England" | "Scotland" | "Wales"
+  unknown: boolean
+}</pre></td><td>GB DNO region detail, when known. id/name are only ever present for NESO regional responses; nation may be present on its own when only a coarser signal (e.g. Cloudflare's detected nation) was available.</td></tr>
+<tr><td><code>location.region.unknown</code></td><td><pre>boolean</pre></td><td>True when none of id/name/nation could be determined for this request.</td></tr>
+<tr><td><code>datetime</code></td><td><pre>string</pre></td><td>Start of the reporting period, ISO 8601 UTC.</td></tr>
+<tr><td><code>validTo</code></td><td><pre>string</pre></td><td>End of the reporting period, when known.</td></tr>
+<tr><td><code>carbonIntensity</code></td><td><pre>{
+  value: number
+  unit: "gCO2eq/kWh"
+  type: "actual" | "forecast" | "estimated" | "unknown"
+  band: "low" | "moderate" | "high" | "very-high" | "unknown"
+}</pre></td><td>The carbon intensity figure itself.</td></tr>
+<tr><td><code>carbonIntensity.value</code></td><td><pre>number</pre></td><td>The carbon intensity figure, in `unit`. `null` when `band` is "unknown".</td></tr>
+<tr><td><code>carbonIntensity.type</code></td><td><pre>"actual" | "forecast" | "estimated" | "unknown"</pre></td><td>"actual" = measured (NESO national, when available), "forecast" = NESO's forward estimate (national fallback and all regional data), "estimated" = Electricity Maps' modeled figure, "unknown" = an upstream provider failed or returned unusable data.</td></tr>
+<tr><td><code>carbonIntensity.band</code></td><td><pre>"low" | "moderate" | "high" | "very-high" | "unknown"</pre></td><td>Coarse category for the value. GB responses use NESO's own live index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data - see `fallback.reason`.</td></tr>
+<tr><td><code>generationMix</code></td><td><pre>{
+  fuel: string
+  percentage: number
+}[]</pre></td><td>Fuel mix behind this figure. Only returned for NESO regional responses.</td></tr>
+<tr><td><code>fallback</code></td><td><pre>{
+  reason: string
+}</pre></td><td>Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed and `band`/`type` fell back to "unknown".</td></tr></tbody>
+</table>
+<h4><code>400</code> - Missing or invalid query parameters</h4>
+<pre>{
+  error: {
+    message: string
+    provider?: "electricitymaps" | "neso"
+  }
+}</pre>
+
+<h4><code>403</code> - NESO-only data requested from a non-UK origin</h4>
+<pre>{
+  error: {
+    message: string
+    provider?: "electricitymaps" | "neso"
+  }
+}</pre>
+
+</section>
+
+<section>
+  <h3><code>GET /v1/zones</code></h3>
+  <p>List Electricity Maps zones</p>
+  
+  <h4>Parameters</h4>
+  <p><em>No parameters.</em></p>
+  <h4>Responses</h4>
+  <h4><code>200</code> - Electricity Maps' supported zone list, proxied so clients never need their own token</h4>
+<pre>{ [key: string]: {
+  zoneName?: string
+  countryName?: string
+} }</pre>
+
+<h4><code>400</code> - This deployment has no Electricity Maps token configured</h4>
+<pre>{
+  error: {
+    message: string
+    provider?: "electricitymaps" | "neso"
+  }
+}</pre>
+
+<h4><code>502</code> - Electricity Maps failed to respond</h4>
+<pre>{
+  error: {
+    message: string
+    provider?: "electricitymaps" | "neso"
+  }
+}</pre>
+
+</section>
+  </main>
+<footer>
+  GB data from NESO's Carbon Intensity API, licensed
+  <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+  Global data from <a href="https://electricitymaps.com">Electricity Maps</a>.
+</footer>
+</body>
+</html>

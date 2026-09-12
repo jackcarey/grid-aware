@@ -1,0 +1,75 @@
+# grid-aware
+
+Combines [Electricity Maps](https://electricitymaps.com) (global grid carbon intensity) with the
+UK [NESO Carbon Intensity API](https://carbonintensity.org.uk) (free, GB-only, but regionally
+granular) behind one Cloudflare Worker API, plus a tiny browser package that reflects the current
+intensity as a `data-grid-aware` attribute on a page. With no zone/postcode/regionid given, the API
+defaults to the caller's own Cloudflare-detected location - a UK postcode where available, else
+just their country - so UK consumers get NESO's finer regional data for free, with no params to
+know about. The worker's own landing page uses exactly this to show your current grid intensity live.
+
+## Packages
+
+- [`worker/`](worker) - the Cloudflare Worker API (Hono + `@hono/zod-openapi`), host-agnostic core
+  with a thin Cloudflare-specific adapter in `src/platform/cloudflare.ts`.
+- [`packages/grid-aware/`](packages/grid-aware) - `@web-components/grid-aware` on JSR, a small
+  client + `<script>`-tag widget consuming the worker's API.
+
+## Getting started
+
+```
+npm install
+npm run generate      # writes worker/openapi.json, worker/src/pages/index.html.ts,
+                       # worker/src/pages/widget.js.ts, and packages/grid-aware/src/client.gen.ts
+npm run typecheck
+npm test
+```
+
+### Running the worker locally
+
+```
+cd worker
+cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN and ALLOWED_ORIGINS
+npx wrangler dev
+```
+
+`/v1/*` requests need a matching `Origin`/`Referer` header (see `.dev.vars.example` for a
+localhost entry) - this isn't just CORS politeness, it's an access-control allowlist protecting
+your own Electricity Maps quota. `/` (landing page + generated API reference) and
+`/openapi.json` are open to everyone.
+
+### Deploying
+
+```
+cd worker
+npx wrangler login                        # once
+npx wrangler secret put ELECTRICITY_MAPS_TOKEN
+npx wrangler secret put ALLOWED_ORIGINS
+npx wrangler deploy
+```
+
+If you add a custom domain via a `routes` entry in `wrangler.toml`, also set `workers_dev = true`
+explicitly - otherwise Wrangler disables the `*.workers.dev` subdomain as soon as any route is
+declared. The same `routes` entry also changes what `wrangler dev` reports as the request origin
+locally (it simulates the configured hostname), so local testing against `localhost` can behave
+differently once a custom domain is configured.
+
+### Publishing the browser package
+
+Requires the `web-components` scope on jsr.io and (for CI) that scope's GitHub repo linked as a
+Trusted Publisher. Locally:
+
+```
+cd packages/grid-aware
+npx jsr publish
+```
+
+## Versioning
+
+One version number covers the whole repo. Bump it in all of these together: root `package.json`,
+`worker/package.json`, `packages/grid-aware/package.json`, `packages/grid-aware/jsr.json`, the
+OpenAPI `info.version` in `worker/src/app.ts`, and the git tag / GitHub release used to publish.
+
+## License
+
+[MIT](LICENSE)
