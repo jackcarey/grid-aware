@@ -51,11 +51,10 @@ export const introHtml = `<h1>grid-aware</h1>
   html[data-grid-aware="high"] video { display: none; }
 &lt;/style&gt;</pre>
 <p>
-  That script tag is a JS module, so it's deferred by the browser - the band gets applied
-  after the page has already started rendering, which can flash the default styling for a
-  moment. To avoid that, a plain (non-module) blocking build is available too: placed early
-  in <code>&lt;head&gt;</code>, it fetches synchronously and sets <code>data-grid-aware</code>
-  before the rest of the page paints, at the cost of stalling the page load on that request:
+  This is a JS module, so it's deferred by the browser and the band gets applied
+  after the page has already started rendering; it can flash default styling. To avoid that, a plain (non-module) blocking build is available to place early
+  in <code>&lt;head&gt;</code>. It fetches synchronously and sets <code>data-grid-aware</code>
+  before the rest of the page paints, at the cost of stalling the page load on the first request (a cached response is used on subsequent loads):
 </p>
 <pre>&lt;script src="<span class="this-worker-url">https://your-deployed-url.com</span>/grid-aware/blocking.js"
         data-api-base-url="<span class="this-worker-url">https://your-deployed-url.com</span>"&gt;&lt;/script&gt;</pre>
