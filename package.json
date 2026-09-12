@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "generate:openapi": "npm run generate:openapi --workspace worker",
     "generate:client": "npm run generate:client --workspace packages/grid-aware",
     "generate": "npm run generate:openapi && npm run generate:client",
