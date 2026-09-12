@@ -29,9 +29,8 @@ export interface BandThresholds {
 }
 
 /**
- * Electricity Maps has no official index, and grids worldwide span two orders of
- * magnitude (France ~50 gCO2/kWh vs. coal-heavy grids ~700+), so GB's bands don't
- * transfer. These are rough global defaults, not sourced from either upstream.
+ * Electricity Maps has no official index, and worldwide grids vary a lot, so GB's bands don't
+ * necessarily transfer. These are rough values, not sourced from either upstream.
  */
 export const DEFAULT_BAND_THRESHOLDS: BandThresholds = {
   moderate: 100,

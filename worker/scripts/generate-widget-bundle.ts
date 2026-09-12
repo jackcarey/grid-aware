@@ -26,6 +26,6 @@ async function bundle(entryName: string, format: "esm" | "iife", outName: string
 }
 
 await bundle("index.ts", "esm", "index.js");
-// A classic (non-module) build: document.currentScript only resolves for these,
-// and only a classic script can run synchronously/blocking without async or defer.
+// A non-module build: document.currentScript only resolves for these,
+// and only a non-module script can run synchronously/blocking without async or defer.
 await bundle("browser-blocking.ts", "iife", "blocking.js");

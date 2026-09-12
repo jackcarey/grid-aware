@@ -1,6 +1,6 @@
 import type { RegionInfo } from "./types.js";
 
-/** Maps a Cloudflare-detected city to a DNO regionid. Coverage is partial - unmatched cities fall back to nation. */
+/** Maps a Cloudflare-detected city to a DNO regionid. The list is fairly arbitrary for now since unmatched cities fall back to the nation. */
 const CITY_TO_REGION_ID: Record<string, number> = {
   // 1: North Scotland
   aberdeen: 1,
@@ -154,7 +154,7 @@ export function regionIdForCity(city: string | undefined): number | undefined {
 
 const NATIONS = new Set(["England", "Scotland", "Wales"]);
 
-/** Only usable as a nation when it's exactly one of GB's three - anything else (a county, a US state) is ignored. */
+/** Only usable as a nation when it's GB - anything else is ignored. */
 export function nationFromRegionName(region: string | undefined): RegionInfo["nation"] {
   if (region && NATIONS.has(region)) return region as RegionInfo["nation"];
   return undefined;

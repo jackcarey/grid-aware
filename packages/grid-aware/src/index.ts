@@ -44,8 +44,8 @@ export interface GridAwareBlockingOptions {
 }
 
 /**
- * Fetches synchronously (blocking the parser) so `data-grid-aware` is set
- * before first paint, with no flash of unstyled/default content. Costs a full
+ * Fetches synchronously so `data-grid-aware` is set
+ * before first paint, with no flash of unstyled/default content. The first load costs a full
  * network round-trip on the main thread on every page load - only use this
  * for a script placed early in `<head>`, not the default async `initGridAware`.
  */
@@ -93,7 +93,7 @@ export function initGridAware(options: GridAwareOptions): GridAwareHandle {
   const client = createGridAwareClient(options.apiBaseUrl);
 
   // How long a fetched response is reused before refresh() fetches again. 0 means
-  // always fetch fresh. Independent of whether there's a recurring timer - see autoRefresh.
+  // always fetch fresh. Independent of whether there's a recurring autoRefresh timer
   const maxAgeMs = options.maxAgeMs ?? DEFAULT_MAX_AGE_MS;
   const autoRefresh = options.autoRefresh ?? true;
 

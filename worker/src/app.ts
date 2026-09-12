@@ -1,9 +1,9 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { ApiError, errorBody } from "./errors.js";
 import { createAllowlistMiddleware } from "./middleware/allowlist.js";
-import { errorBody, ApiError } from "./errors.js";
+import type { AppDeps, AppEnv } from "./ports.js";
 import { registerIntensityRoute } from "./routes/intensity.js";
 import { registerZonesRoute } from "./routes/zones.js";
-import type { AppDeps, AppEnv } from "./ports.js";
 
 export function createApp(deps: AppDeps): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();

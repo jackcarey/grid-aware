@@ -152,7 +152,7 @@ async function resolveResponse(
         "ELECTRICITY_MAPS_TOKEN is not configured on this deployment",
       );
     }
-    // Electricity Maps zones have no GB DNO region concept, regardless of nation.
+    // Electricity Maps zones have no GB DNO region
     const location = { zone: target.zone, region: { unknown: true } };
     if (horizon === "latest") {
       const raw = await electricityMaps.getLatestIntensity(
@@ -218,7 +218,7 @@ async function resolveResponse(
   });
 }
 
-/** Upstream failure shouldn't break callers who expect this endpoint to always answer. */
+/** Upstream failure doesn't break this endpoint, it returns unknown instead. */
 function unknownIntensityResponse(
   target: ResolvedTarget,
   reason: string,
@@ -262,7 +262,7 @@ const route = createRoute({
   },
   summary: "Get combined grid carbon intensity",
   description:
-    "Routes to NESO for GB national/regional subjects (UK-origin requests only) and to Electricity Maps for everything else. With no zone/postcode/regionid at all, defaults to the caller's own Cloudflare-detected location - a UK postcode where available, else just the caller's country.",
+    "Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).",
 });
 
 export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
@@ -337,7 +337,7 @@ export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
         },
       );
     } catch (err) {
-      // Caller-caused errors (bad config, forbidden) stay hard errors; only upstream
+      // Caller-caused errors (bad config, forbidden) stay as errors; only upstream
       // failure falls back, and throwing before withEdgeCache resolves keeps it uncached.
       if (err instanceof ApiError && !(err instanceof UpstreamError)) throw err;
       const reason =

@@ -3,14 +3,14 @@ import { z } from "@hono/zod-openapi";
 export const BandSchema = z.enum(["low", "moderate", "high", "very-high", "unknown"]).openapi({
   example: "moderate",
   description:
-    "Coarse category for the value. GB responses use NESO's own live index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data - see `fallback.reason`.",
+    "Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data, see `fallback.reason`.",
 });
 
 export const GridIntensityResponseSchema = z
   .object({
     source: z.enum(["electricitymaps", "neso"]).openapi({
       example: "neso",
-      description: "Which upstream actually answered this request.",
+      description: "Which upstream answered this request",
     }),
     location: z
       .object({
@@ -30,7 +30,7 @@ export const GridIntensityResponseSchema = z
           }),
       })
       .openapi({
-        description: "Echoes back what this response is about, so you never have to re-parse the request.",
+        description: "Echoes back where this response is about, so you never have to re-parse the request.",
       }),
     datetime: z.string().openapi({
       example: "2026-09-11T12:00:00.000Z",

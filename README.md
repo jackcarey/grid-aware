@@ -1,12 +1,7 @@
 # grid-aware
 
 Combines [Electricity Maps](https://electricitymaps.com) (global grid carbon intensity) with the
-UK [NESO Carbon Intensity API](https://carbonintensity.org.uk) (free, GB-only, but regionally
-granular) behind one Cloudflare Worker API, plus a tiny browser package that reflects the current
-intensity as a `data-grid-aware` attribute on a page. With no zone/postcode/regionid given, the API
-defaults to the caller's own Cloudflare-detected location - a UK postcode where available, else
-just their country - so UK consumers get NESO's finer regional data for free, with no params to
-know about. The worker's own landing page uses exactly this to show your current grid intensity live.
+[NESO Carbon Intensity API](https://carbonintensity.org.uk) (UK DNO regions) behind one API, plus a tiny browser package that reflects the current intensity as a `data-grid-aware` attribute on a page. A Cloudflare wrapper is set up, so with no explicit zone/postcode/regionid, the API defaults to its detected location.
 
 ## Packages
 
@@ -25,7 +20,7 @@ npm run typecheck
 npm test
 ```
 
-### Running the worker locally
+### Running locally
 
 ```
 cd worker

@@ -1,6 +1,6 @@
 import { initGridAwareBlocking } from "./index.js";
 
-// document.currentScript only resolves for a classic (non-module) script
+// document.currentScript only resolves for a non-module script
 // this entry point must be loaded as a plain <script>, not type="module".
 const currentScript = document.currentScript as HTMLScriptElement | null;
 const apiBaseUrl = currentScript?.dataset.apiBaseUrl;

@@ -9,9 +9,6 @@ routes = [
 
 ]
 
-[vars]
-ALLOWED_ORIGINS = "https://grid.jackcarey.co.uk,https://grid-aware.jackcarey.co.uk,https://jackcarey.co.uk"
-
 [assets]
 directory = "./public"
 binding = "ASSETS"
