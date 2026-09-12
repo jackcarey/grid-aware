@@ -11,11 +11,15 @@ if (!apiBaseUrl) {
   );
 } else {
   const regionid = currentScript?.dataset.regionid ? Number(currentScript.dataset.regionid) : undefined;
+  const maxAgeMs = currentScript?.dataset.maxAgeMs
+    ? Number(currentScript.dataset.maxAgeMs)
+    : undefined;
 
   initGridAwareBlocking({
     apiBaseUrl,
     zone: currentScript?.dataset.zone,
     postcode: currentScript?.dataset.postcode,
     regionid,
+    maxAgeMs,
   });
 }

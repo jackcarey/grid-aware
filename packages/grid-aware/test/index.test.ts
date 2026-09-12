@@ -5,6 +5,7 @@ describe("initGridAware", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     document.documentElement.removeAttribute("data-grid-aware");
+    sessionStorage.clear();
   });
 
   it("sets data-grid-aware from the API response", async () => {
@@ -192,6 +193,7 @@ describe("initGridAwareBlocking", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     document.documentElement.removeAttribute("data-grid-aware");
+    sessionStorage.clear();
   });
 
   const okResponse = JSON.stringify({
@@ -249,5 +251,64 @@ describe("initGridAwareBlocking", () => {
 
   it("throws when apiBaseUrl is missing", () => {
     expect(() => initGridAwareBlocking({ apiBaseUrl: "" })).toThrow(/apiBaseUrl/);
+  });
+
+  it("reuses a cached result within maxAgeMs, without a second request", () => {
+    let requests = 0;
+    class MockXHR {
+      status = 200;
+      responseText = okResponse;
+      open() {
+        requests++;
+      }
+      send() { }
+    }
+    vi.stubGlobal("XMLHttpRequest", MockXHR);
+
+    initGridAwareBlocking({ apiBaseUrl: "https://example.com", maxAgeMs: 60_000 });
+    document.documentElement.removeAttribute("data-grid-aware");
+    initGridAwareBlocking({ apiBaseUrl: "https://example.com", maxAgeMs: 60_000 });
+
+    expect(requests).toBe(1);
+    expect(document.documentElement.dataset.gridAware).toBe("low");
+  });
+
+  it("fetches again once the cached result is older than maxAgeMs", () => {
+    vi.useFakeTimers();
+    let requests = 0;
+    class MockXHR {
+      status = 200;
+      responseText = okResponse;
+      open() {
+        requests++;
+      }
+      send() { }
+    }
+    vi.stubGlobal("XMLHttpRequest", MockXHR);
+
+    initGridAwareBlocking({ apiBaseUrl: "https://example.com", maxAgeMs: 60_000 });
+    vi.advanceTimersByTime(60_000);
+    initGridAwareBlocking({ apiBaseUrl: "https://example.com", maxAgeMs: 60_000 });
+
+    expect(requests).toBe(2);
+    vi.useRealTimers();
+  });
+
+  it("fetches fresh every time when maxAgeMs is 0", () => {
+    let requests = 0;
+    class MockXHR {
+      status = 200;
+      responseText = okResponse;
+      open() {
+        requests++;
+      }
+      send() { }
+    }
+    vi.stubGlobal("XMLHttpRequest", MockXHR);
+
+    initGridAwareBlocking({ apiBaseUrl: "https://example.com", maxAgeMs: 0 });
+    initGridAwareBlocking({ apiBaseUrl: "https://example.com", maxAgeMs: 0 });
+
+    expect(requests).toBe(2);
   });
 });

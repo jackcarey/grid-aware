@@ -46,7 +46,47 @@ function unknownIntensityData(): GridIntensityData {
   };
 }
 
-/** Same as {@link GridAwareOptions}, but no caching options */
+/** Same request, every time, for the same inputs - used as both the actual blocking-build URL and the cache key for both functions. */
+function intensityRequestUrl(
+  apiBaseUrl: string,
+  subject: { zone?: string; postcode?: string; regionid?: number },
+): string {
+  const params = new URLSearchParams();
+  if (subject.zone) params.set("zone", subject.zone);
+  if (subject.postcode) params.set("postcode", subject.postcode);
+  if (subject.regionid !== undefined) params.set("regionid", String(subject.regionid));
+  const query = params.toString();
+  const baseUrl = apiBaseUrl.endsWith("/") ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+  return `${baseUrl}/v1/intensity${query ? `?${query}` : ""}`;
+}
+
+interface CacheEntry {
+  data: GridIntensityData;
+  fetchedAt: number;
+}
+
+// One cache, backed by sessionStorage so it survives a full page reload (initGridAwareBlocking's
+// only chance to reuse anything) and doubles as initGridAware's in-page cache too.
+function readCache(key: string, maxAgeMs: number): GridIntensityData | undefined {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return undefined;
+    const entry = JSON.parse(raw) as CacheEntry;
+    return Date.now() - entry.fetchedAt < maxAgeMs ? entry.data : undefined;
+  } catch {
+    return undefined; // sessionStorage can be unavailable (private mode, quota, etc.) - just skip the cache
+  }
+}
+
+function writeCache(key: string, data: GridIntensityData): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ data, fetchedAt: Date.now() } satisfies CacheEntry));
+  } catch {
+    // Same as above - caching is a nice-to-have, never worth failing the page over.
+  }
+}
+
+/** Same as {@link GridAwareOptions}, but no `autoRefresh` - it's a one-shot call, there's no timer. */
 export interface GridAwareBlockingOptions {
   /** Your worker's URL. Required. */
   apiBaseUrl: string;
@@ -58,11 +98,13 @@ export interface GridAwareBlockingOptions {
   regionid?: number;
   /** Turns the response into your `data-grid-aware` value. Default: just use the band ("low", "high", etc). */
   mapBand?: (data: GridIntensityData) => string;
+  /** How long to reuse a cached result in ms. `0` = always fetch fresh. Default: 30 minutes. */
+  maxAgeMs?: number;
 }
 
 /**
  * Sets `data-grid-aware` before the page paints. No flash of default styling but it
- * blocks the page load with a real network request. No caching.
+ * blocks the page load
  *
  * Only use this in an early `<head>` script. Otherwise use {@link initGridAware}.
  */
@@ -71,29 +113,26 @@ export function initGridAwareBlocking(options: GridAwareBlockingOptions): void {
     throw new Error("grid-aware: apiBaseUrl is required");
   }
 
-  const params = new URLSearchParams();
-  if (options.zone) params.set("zone", options.zone);
-  if (options.postcode) params.set("postcode", options.postcode);
-  if (options.regionid !== undefined)
-    params.set("regionid", String(options.regionid));
-  const query = params.toString();
-  const baseUrl = options.apiBaseUrl.endsWith("/")
-    ? options.apiBaseUrl.slice(0, -1)
-    : options.apiBaseUrl;
-  const url = `${baseUrl}/v1/intensity${query ? `?${query}` : ""}`;
+  const url = intensityRequestUrl(options.apiBaseUrl, options);
+  const maxAgeMs = options.maxAgeMs ?? DEFAULT_MAX_AGE_MS;
+  const cacheKey = `grid-aware:${url}`;
 
-  let data: GridIntensityData;
-  try {
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", url, false); // false: synchronous, blocks until the response arrives
-    xhr.send();
-    if (xhr.status < 200 || xhr.status >= 300) {
-      throw new Error(`request failed with status ${xhr.status}`);
+  let data = maxAgeMs > 0 ? readCache(cacheKey, maxAgeMs) : undefined;
+
+  if (!data) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url, false); // false: synchronous, blocks until the response arrives
+      xhr.send();
+      if (xhr.status < 200 || xhr.status >= 300) {
+        throw new Error(`request failed with status ${xhr.status}`);
+      }
+      data = JSON.parse(xhr.responseText) as GridIntensityData;
+      if (maxAgeMs > 0) writeCache(cacheKey, data);
+    } catch (error) {
+      console.error("grid-aware: blocking fetch failed", error);
+      data = unknownIntensityData();
     }
-    data = JSON.parse(xhr.responseText) as GridIntensityData;
-  } catch (error) {
-    console.error("grid-aware: blocking fetch failed", error);
-    data = unknownIntensityData();
   }
 
   const band = options.mapBand
@@ -117,8 +156,7 @@ export function initGridAware(options: GridAwareOptions): GridAwareHandle {
 
   const maxAgeMs = options.maxAgeMs ?? DEFAULT_MAX_AGE_MS;
   const autoRefresh = options.autoRefresh ?? true;
-
-  let cached: { data: GridIntensityData; fetchedAt: number } | undefined;
+  const cacheKey = `grid-aware:${intensityRequestUrl(options.apiBaseUrl, options)}`;
 
   function applyBand(data: GridIntensityData): void {
     const band = options.mapBand
@@ -128,8 +166,9 @@ export function initGridAware(options: GridAwareOptions): GridAwareHandle {
   }
 
   async function refresh(): Promise<void> {
-    if (maxAgeMs > 0 && cached && Date.now() - cached.fetchedAt < maxAgeMs) {
-      applyBand(cached.data);
+    const cached = maxAgeMs > 0 ? readCache(cacheKey, maxAgeMs) : undefined;
+    if (cached) {
+      applyBand(cached);
       return;
     }
 
@@ -149,7 +188,7 @@ export function initGridAware(options: GridAwareOptions): GridAwareHandle {
       return;
     }
 
-    cached = { data, fetchedAt: Date.now() };
+    if (maxAgeMs > 0) writeCache(cacheKey, data);
     applyBand(data);
   }
 
