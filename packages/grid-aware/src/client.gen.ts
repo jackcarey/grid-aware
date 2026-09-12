@@ -10,7 +10,7 @@ export interface paths {
         };
         /**
          * Get combined grid carbon intensity
-         * @description Routes to NESO for GB national/regional subjects (UK-origin requests only) and to Electricity Maps for everything else. With no zone/postcode/regionid at all, defaults to the caller's own Cloudflare-detected location - a UK postcode where available, else just the caller's country.
+         * @description Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).
          */
         get: {
             parameters: {
@@ -125,12 +125,12 @@ export interface components {
     schemas: {
         GridIntensityResponse: {
             /**
-             * @description Which upstream actually answered this request.
+             * @description Which upstream answered this request
              * @example neso
              * @enum {string}
              */
             source: "electricitymaps" | "neso";
-            /** @description Echoes back what this response is about, so you never have to re-parse the request. */
+            /** @description Echoes back where this response is about, so you never have to re-parse the request. */
             location: {
                 /** @description Electricity Maps zone code (always "GB" for NESO responses). */
                 zone: string;
@@ -166,7 +166,7 @@ export interface components {
                  */
                 type: "actual" | "forecast" | "estimated" | "unknown";
                 /**
-                 * @description Coarse category for the value. GB responses use NESO's own live index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data - see `fallback.reason`.
+                 * @description Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.
                  * @example moderate
                  * @enum {string}
                  */

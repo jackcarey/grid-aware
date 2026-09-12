@@ -97,7 +97,7 @@
 <section>
   <h3><code>GET /v1/intensity</code></h3>
   <p>Get combined grid carbon intensity</p>
-  <p>Routes to NESO for GB national/regional subjects (UK-origin requests only) and to Electricity Maps for everything else. With no zone/postcode/regionid at all, defaults to the caller's own Cloudflare-detected location - a UK postcode where available, else just the caller's country.</p>
+  <p>Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).</p>
   <h4>Parameters</h4>
   <table>
 <thead><tr><th>Name</th><th>In</th><th>Required</th><th>Type</th><th>Default</th></tr></thead>
@@ -138,7 +138,7 @@
 }</pre>
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
-<tbody><tr><td><code>source</code></td><td><pre>"electricitymaps" | "neso"</pre></td><td>Which upstream actually answered this request.</td></tr>
+<tbody><tr><td><code>source</code></td><td><pre>"electricitymaps" | "neso"</pre></td><td>Which upstream answered this request</td></tr>
 <tr><td><code>location</code></td><td><pre>{
   zone: string
   region: {
@@ -147,7 +147,7 @@
     nation?: "England" | "Scotland" | "Wales"
     unknown: boolean
   }
-}</pre></td><td>Echoes back what this response is about, so you never have to re-parse the request.</td></tr>
+}</pre></td><td>Echoes back where this response is about, so you never have to re-parse the request.</td></tr>
 <tr><td><code>location.zone</code></td><td><pre>string</pre></td><td>Electricity Maps zone code (always "GB" for NESO responses).</td></tr>
 <tr><td><code>location.region</code></td><td><pre>{
   id?: number
@@ -166,7 +166,7 @@
 }</pre></td><td>The carbon intensity figure itself.</td></tr>
 <tr><td><code>carbonIntensity.value</code></td><td><pre>number</pre></td><td>The carbon intensity figure, in `unit`. `null` when `band` is "unknown".</td></tr>
 <tr><td><code>carbonIntensity.type</code></td><td><pre>"actual" | "forecast" | "estimated" | "unknown"</pre></td><td>"actual" = measured (NESO national, when available), "forecast" = NESO's forward estimate (national fallback and all regional data), "estimated" = Electricity Maps' modeled figure, "unknown" = an upstream provider failed or returned unusable data.</td></tr>
-<tr><td><code>carbonIntensity.band</code></td><td><pre>"low" | "moderate" | "high" | "very-high" | "unknown"</pre></td><td>Coarse category for the value. GB responses use NESO's own live index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data - see `fallback.reason`.</td></tr>
+<tr><td><code>carbonIntensity.band</code></td><td><pre>"low" | "moderate" | "high" | "very-high" | "unknown"</pre></td><td>Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.</td></tr>
 <tr><td><code>generationMix</code></td><td><pre>{
   fuel: string
   percentage: number
