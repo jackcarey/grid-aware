@@ -172,15 +172,21 @@ export function initGridAware(options: GridAwareOptions): GridAwareHandle {
       return;
     }
 
-    const { data, error } = await client.GET("/v1/intensity", {
-      params: {
-        query: {
-          zone: options.zone,
-          postcode: options.postcode,
-          regionid: options.regionid,
+    let data: GridIntensityData | undefined;
+    let error: unknown;
+    try {
+      ({ data, error } = await client.GET("/v1/intensity", {
+        params: {
+          query: {
+            zone: options.zone,
+            postcode: options.postcode,
+            regionid: options.regionid,
+          },
         },
-      },
-    });
+      }));
+    } catch (fetchError) {
+      error = fetchError;
+    }
 
     if (error || !data) {
       console.error("grid-aware: failed to fetch intensity", error);
