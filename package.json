@@ -1,0 +1,17 @@
+{
+  "name": "grid-aware",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "worker",
+    "packages/*"
+  ],
+  "scripts": {
+    "generate:openapi": "npm run generate:openapi --workspace worker",
+    "generate:client": "npm run generate:client --workspace packages/grid-aware",
+    "generate": "npm run generate:openapi && npm run generate:client",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
+    "dev": "npm run dev --workspace worker"
+  }
+}

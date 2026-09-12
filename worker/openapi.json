@@ -1,0 +1,337 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "grid-aware",
+    "version": "1.0.0",
+    "description": "Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API."
+  },
+  "components": {
+    "schemas": {
+      "GridIntensityResponse": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "electricitymaps",
+              "neso"
+            ],
+            "example": "neso",
+            "description": "Which upstream actually answered this request."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "zone": {
+                "type": "string",
+                "description": "Electricity Maps zone code (always \"GB\" for NESO responses)."
+              },
+              "region": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "nation": {
+                    "type": "string",
+                    "enum": [
+                      "England",
+                      "Scotland",
+                      "Wales"
+                    ]
+                  },
+                  "unknown": {
+                    "type": "boolean",
+                    "description": "True when none of id/name/nation could be determined for this request."
+                  }
+                },
+                "required": [
+                  "unknown"
+                ],
+                "description": "GB DNO region detail, when known. id/name are only ever present for NESO regional responses; nation may be present on its own when only a coarser signal (e.g. Cloudflare's detected nation) was available."
+              }
+            },
+            "required": [
+              "zone",
+              "region"
+            ],
+            "description": "Echoes back what this response is about, so you never have to re-parse the request."
+          },
+          "datetime": {
+            "type": "string",
+            "example": "2026-09-11T12:00:00.000Z",
+            "description": "Start of the reporting period, ISO 8601 UTC."
+          },
+          "validTo": {
+            "type": "string",
+            "description": "End of the reporting period, when known."
+          },
+          "carbonIntensity": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "nullable": true,
+                "example": 123,
+                "description": "The carbon intensity figure, in `unit`. `null` when `band` is \"unknown\"."
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "gCO2eq/kWh"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "actual",
+                  "forecast",
+                  "estimated",
+                  "unknown"
+                ],
+                "description": "\"actual\" = measured (NESO national, when available), \"forecast\" = NESO's forward estimate (national fallback and all regional data), \"estimated\" = Electricity Maps' modeled figure, \"unknown\" = an upstream provider failed or returned unusable data."
+              },
+              "band": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "moderate",
+                  "high",
+                  "very-high",
+                  "unknown"
+                ],
+                "example": "moderate",
+                "description": "Coarse category for the value. GB responses use NESO's own live index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data - see `fallback.reason`."
+              }
+            },
+            "required": [
+              "value",
+              "unit",
+              "type",
+              "band"
+            ],
+            "description": "The carbon intensity figure itself."
+          },
+          "generationMix": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fuel": {
+                  "type": "string"
+                },
+                "percentage": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "fuel",
+                "percentage"
+              ]
+            },
+            "description": "Fuel mix behind this figure. Only returned for NESO regional responses."
+          },
+          "fallback": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "description": "Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed and `band`/`type` fell back to \"unknown\"."
+          }
+        },
+        "required": [
+          "source",
+          "location",
+          "datetime",
+          "carbonIntensity"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "electricitymaps",
+                  "neso"
+                ]
+              }
+            },
+            "required": [
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ZoneList": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "zoneName": {
+              "type": "string"
+            },
+            "countryName": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/v1/intensity": {
+      "get": {
+        "summary": "Get combined grid carbon intensity",
+        "description": "Routes to NESO for GB national/regional subjects (UK-origin requests only) and to Electricity Maps for everything else. With no zone/postcode/regionid at all, defaults to the caller's own Cloudflare-detected location - a UK postcode where available, else just the caller's country.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "FR",
+              "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country)."
+            },
+            "required": false,
+            "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country).",
+            "name": "zone",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "SW1A"
+            },
+            "required": false,
+            "name": "postcode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "example": 13
+            },
+            "required": false,
+            "name": "regionid",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "24h",
+                "48h"
+              ],
+              "default": "latest"
+            },
+            "required": false,
+            "name": "horizon",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "electricitymaps",
+                "neso"
+              ],
+              "default": "auto"
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Normalized grid carbon intensity for the requested location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridIntensityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "NESO-only data requested from a non-UK origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones": {
+      "get": {
+        "summary": "List Electricity Maps zones",
+        "responses": {
+          "200": {
+            "description": "Electricity Maps' supported zone list, proxied so clients never need their own token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "This deployment has no Electricity Maps token configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Electricity Maps failed to respond",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

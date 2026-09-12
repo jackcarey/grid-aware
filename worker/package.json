@@ -1,0 +1,28 @@
+{
+  "name": "grid-aware-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "generate:openapi": "tsx scripts/generate-openapi.ts && tsx scripts/generate-docs-html.ts && tsx scripts/generate-widget-bundle.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts && vitest run --config vitest.workers.config.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20260911.1",
+    "@types/node": "^22.10.5",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.131.1"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "^1.6.3",
+    "hono": "^4.13.7",
+    "zod": "^4.6.2"
+  }
+}
