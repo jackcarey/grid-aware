@@ -1,3 +1,9 @@
+/**
+ * Drop-in plain `<script>` build (not a module - it has to block). Reads its config from
+ * the script tag's own `data-*` attributes and calls {@link initGridAwareBlocking}.
+ * @module
+ */
+
 import { initGridAwareBlocking } from "./index.js";
 
 // document.currentScript only resolves for a non-module script

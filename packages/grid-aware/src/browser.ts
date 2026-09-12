@@ -1,3 +1,9 @@
+/**
+ * Drop-in `<script type="module">` build. Reads its config from the script tag's own
+ * `data-*` attributes and calls {@link initGridAware}.
+ * @module
+ */
+
 import { initGridAware } from "./index.js";
 
 // document.currentScript is always null for a module script (per spec), so this
