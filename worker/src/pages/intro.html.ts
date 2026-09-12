@@ -1,11 +1,8 @@
 export const introHtml = `<h1>grid-aware</h1>
 <p>
   A small API that combines <a href="https://electricitymaps.com">Electricity Maps</a>
-  (global grid carbon intensity, per zone) with the UK
-  <a href="https://carbonintensity.org.uk">NESO Carbon Intensity API</a> (free, GB-only, but
-  regionally granular down to postcode/DNO region) behind one normalized endpoint.
-  NESO is only ever queried for requests originating in the UK; everything else is served
-  via Electricity Maps.
+  (global) with the UK
+  <a href="https://carbonintensity.org.uk">NESO Carbon Intensity API</a> (DNO region) behind one normalized endpoint.
 </p>
 <p>
   <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">Get in touch</a> with questions or feedback.
