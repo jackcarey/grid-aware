@@ -25,6 +25,13 @@ export class ForbiddenError extends ApiError {
   }
 }
 
+export class TooManyRequestsError extends ApiError {
+  constructor(message: string) {
+    super(message, 429);
+    this.name = "TooManyRequestsError";
+  }
+}
+
 export class UpstreamError extends ApiError {
   constructor(message: string, provider: ProviderName) {
     super(message, 502, provider);

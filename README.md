@@ -24,14 +24,9 @@ npm test
 
 ```
 cd worker
-cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN and ALLOWED_ORIGINS
+cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN
 npx wrangler dev
 ```
-
-`/v1/*` requests need a matching `Origin`/`Referer` header (see `.dev.vars.example` for a
-localhost entry) - this isn't just CORS politeness, it's an access-control allowlist protecting
-your own Electricity Maps quota. `/` (landing page + generated API reference) and
-`/openapi.json` are open to everyone.
 
 ### Deploying
 
@@ -39,7 +34,6 @@ your own Electricity Maps quota. `/` (landing page + generated API reference) an
 cd worker
 npx wrangler login                        # once
 npx wrangler secret put ELECTRICITY_MAPS_TOKEN
-npx wrangler secret put ALLOWED_ORIGINS
 npx wrangler deploy
 ```
 

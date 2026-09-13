@@ -8,13 +8,13 @@ const ALLOWED_ORIGIN = "https://example.com";
 function buildDeps(overrides: Partial<AppDeps> = {}): AppDeps {
   return {
     electricityMapsToken: "test-token",
-    allowedOrigins: [ALLOWED_ORIGIN],
     getCountry: () => "GB",
     getPostcode: () => undefined,
     getCity: () => undefined,
     getRegion: () => undefined,
     getColo: () => undefined,
     isOverRegionalRateLimit: async () => false,
+    isOverApiRateLimit: async () => false,
     cache: createInMemoryCacheStore(),
     ...overrides,
   };
@@ -34,11 +34,30 @@ describe("app: public routes", () => {
   });
 });
 
-describe("app: /v1/intensity allowlist", () => {
-  it("rejects a request with no Origin/Referer", async () => {
+describe("app: /v1/intensity", () => {
+  it("serves NESO national data for a caller with no Origin/Referer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  from: "2026-01-01T00:00Z",
+                  to: "2026-01-01T00:30Z",
+                  intensity: { actual: 100, forecast: 100, index: "moderate" },
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
     const app = createApp(buildDeps());
     const res = await app.request("/v1/intensity?zone=GB");
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   it("serves NESO national data for an allowed UK caller", async () => {
@@ -710,16 +729,8 @@ describe("app: /v1/intensity allowlist", () => {
   });
 });
 
-describe("app: /v1/zones allowlist", () => {
-  it("rejects a disallowed origin", async () => {
-    const app = createApp(buildDeps());
-    const res = await app.request("/v1/zones", {
-      headers: { Origin: "https://evil.example" },
-    });
-    expect(res.status).toBe(403);
-  });
-
-  it("proxies the zone list for an allowed origin", async () => {
+describe("app: /v1/zones", () => {
+  it("proxies the zone list for any origin, with no allowlist check", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -731,8 +742,9 @@ describe("app: /v1/zones allowlist", () => {
     );
     const app = createApp(buildDeps());
     const res = await app.request("/v1/zones", {
-      headers: { Origin: ALLOWED_ORIGIN },
+      headers: { Origin: "https://anywhere.example" },
     });
     expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 });

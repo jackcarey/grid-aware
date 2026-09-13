@@ -5,7 +5,6 @@ export interface CacheStore {
 
 export interface AppDeps {
   electricityMapsToken: string | undefined;
-  allowedOrigins: string[];
   getCountry(request: Request): string | undefined;
   /** UK outward postcode (e.g. "SW1A") derived from the edge's geolocation, when available. */
   getPostcode(request: Request): string | undefined;
@@ -17,6 +16,8 @@ export interface AppDeps {
   getColo(request: Request): string | undefined;
   /** True once GB regional traffic is high enough that one shared all-regions fetch beats one-off per-region calls. */
   isOverRegionalRateLimit(): Promise<boolean>;
+  /** True once total /v1/* traffic (any caller, any origin) exceeds the deployment's hard cap - blocks the request outright to protect the upstream quota. */
+  isOverApiRateLimit(): Promise<boolean>;
   cache: CacheStore;
 }
 
@@ -44,13 +45,13 @@ export function createInMemoryCacheStore(): CacheStore {
 export function createNoopAppDeps(overrides: Partial<AppDeps> = {}): AppDeps {
   return {
     electricityMapsToken: undefined,
-    allowedOrigins: [],
     getCountry: () => undefined,
     getPostcode: () => undefined,
     getCity: () => undefined,
     getRegion: () => undefined,
     getColo: () => undefined,
     isOverRegionalRateLimit: async () => false,
+    isOverApiRateLimit: async () => false,
     cache: createInMemoryCacheStore(),
     ...overrides,
   };

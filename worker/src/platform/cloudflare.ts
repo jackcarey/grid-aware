@@ -1,12 +1,11 @@
 import { createApp } from "../app.js";
-import { parseAllowedOrigins } from "../config.js";
 import { toOutwardPostcode } from "../geo.js";
 import type { AppDeps, CacheStore } from "../ports.js";
 
 export interface Env {
   ELECTRICITY_MAPS_TOKEN?: string;
-  ALLOWED_ORIGINS?: string;
   GB_REGIONAL_RATE_LIMITER: RateLimit;
+  API_RATE_LIMITER: RateLimit;
   ASSETS: Fetcher;
 }
 
@@ -58,17 +57,24 @@ export async function isOverRegionalRateLimit(rateLimiter: RateLimit): Promise<b
   return !success;
 }
 
+const API_RATE_LIMIT_KEY = "v1-global";
+
+export async function isOverApiRateLimit(rateLimiter: RateLimit): Promise<boolean> {
+  const { success } = await rateLimiter.limit({ key: API_RATE_LIMIT_KEY });
+  return !success;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const deps: AppDeps = {
       electricityMapsToken: env.ELECTRICITY_MAPS_TOKEN,
-      allowedOrigins: parseAllowedOrigins(env.ALLOWED_ORIGINS),
       getCountry,
       getPostcode,
       getCity,
       getRegion,
       getColo,
       isOverRegionalRateLimit: () => isOverRegionalRateLimit(env.GB_REGIONAL_RATE_LIMITER),
+      isOverApiRateLimit: () => isOverApiRateLimit(env.API_RATE_LIMITER),
       cache: createCloudflareCacheStore(ctx),
     };
 

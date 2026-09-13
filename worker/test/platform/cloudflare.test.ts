@@ -1,14 +1,17 @@
 /// <reference types="@cloudflare/vitest-pool-workers/types" />
-import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
+import {
+  createExecutionContext,
+  env,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import type { Env } from "../../src/platform/cloudflare.js";
 import {
   createCloudflareCacheStore,
   getCountry,
   getPostcode,
   isOverRegionalRateLimit,
 } from "../../src/platform/cloudflare.js";
-import worker from "../../src/platform/cloudflare.js";
-import type { Env } from "../../src/platform/cloudflare.js";
 
 describe("getCountry", () => {
   it("reads request.cf.country when present", () => {
@@ -46,7 +49,11 @@ describe("createCloudflareCacheStore", () => {
 
     expect(await store.get(key)).toBeUndefined();
 
-    await store.set(key, new Response(JSON.stringify({ ok: true }), { status: 200 }), 60);
+    await store.set(
+      key,
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      60,
+    );
     await waitOnExecutionContext(ctx);
 
     const cached = await store.get(key);
@@ -65,33 +72,25 @@ describe("isOverRegionalRateLimit", () => {
 
 describe("static assets", () => {
   it("serves the docs page at /", async () => {
-    const res = await (env as Env).ASSETS.fetch(new Request("https://worker.example/"));
+    const res = await (env as Env).ASSETS.fetch(
+      new Request("https://worker.example/"),
+    );
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("grid-aware");
     expect(body).toContain('id="api-reference"');
-    expect(body).toContain('import { initGridAware } from "/grid-aware/index.js"');
+    expect(body).toContain(
+      'import { initGridAware } from "/grid-aware/index.js"',
+    );
   });
 
   it("serves the bundled widget JS at /grid-aware/index.js", async () => {
-    const res = await (env as Env).ASSETS.fetch(new Request("https://worker.example/grid-aware/index.js"));
+    const res = await (env as Env).ASSETS.fetch(
+      new Request("https://worker.example/grid-aware/index.js"),
+    );
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("javascript");
     const body = await res.text();
     expect(body).toContain("initGridAware");
-  });
-});
-
-describe("worker.fetch env wiring", () => {
-  it("enforces the allowlist using ALLOWED_ORIGINS from env", async () => {
-    const request = new Request("https://worker.example/v1/intensity?zone=GB");
-    const ctx = createExecutionContext();
-    const response = await worker.fetch(
-      request,
-      { ...env, ALLOWED_ORIGINS: "https://example.com" } as Env,
-      ctx,
-    );
-    await waitOnExecutionContext(ctx);
-    expect(response.status).toBe(403);
   });
 });
