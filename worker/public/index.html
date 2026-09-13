@@ -39,6 +39,7 @@
 <script type="module">
   import { initGridAware } from "/grid-aware/index.js";
   const valueEl = document.getElementById("live-intensity-value");
+  const liveQueryEl = document.getElementById("live-query");
   initGridAware({
     apiBaseUrl: location.origin,
     // No zone given - the worker defaults to the visitor's Cloudflare-detected location (though any location signals from the server host could be passed in)
@@ -46,6 +47,9 @@
     mapBand: (data) => {
       const where = data.location.region.name ?? data.location.zone ?? "your area";
       valueEl.textContent = where + ": " + data.carbonIntensity.value + " gCO2eq/kWh (" + data.carbonIntensity.band + ")";
+      if (liveQueryEl) {
+        liveQueryEl.textContent = "zone=" + data.location.zone;
+      }
       return data.carbonIntensity.band;
     },
   });
@@ -57,8 +61,7 @@
 </script>
 
 <h2>Try it</h2>
-<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?zone=FR'</pre>
-<p>
+<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?<span id="live-query">zone=FR</span>'</pre>
 
 <h2>Use it on a page</h2>
 <p>
