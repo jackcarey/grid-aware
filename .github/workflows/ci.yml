@@ -17,7 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run generate
       - name: Fail if generated files are stale
-        run: git diff --exit-code -- worker/openapi.json worker/public/index.html worker/public/grid-aware/index.js packages/grid-aware/src/client.gen.ts
+        run: git diff --exit-code -- worker/openapi.json worker/public/index.html worker/public/grid-aware/index.js packages/grid-aware/src/client.gen.ts worker/package.json packages/grid-aware/package.json packages/grid-aware/jsr.json
       - run: npm run typecheck
 
   test:
@@ -51,7 +51,7 @@ jobs:
           node-version: 22
       - id: check
         run: |
-          TAG="v$(node -p "require('./packages/grid-aware/package.json').version")"
+          TAG="v$(node -p "require('./package.json').version")"
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "released=false" >> "$GITHUB_OUTPUT"
           else

@@ -1,6 +1,7 @@
 #!/bin/sh
-# Regenerates worker/openapi.json, worker/public/*, and packages/grid-aware/src/client.gen.ts
-# from source before every commit, so CI's "generated files are stale" check never fires.
+# Regenerates worker/openapi.json, worker/public/*, packages/grid-aware/src/client.gen.ts,
+# and syncs the version from root package.json before every commit, so CI's
+# "generated files are stale" check never fires.
 set -e
 
 npm run generate --silent
@@ -10,4 +11,7 @@ git add \
   worker/public/index.html \
   worker/public/grid-aware/index.js \
   worker/public/grid-aware/blocking.js \
-  packages/grid-aware/src/client.gen.ts
+  packages/grid-aware/src/client.gen.ts \
+  worker/package.json \
+  packages/grid-aware/package.json \
+  packages/grid-aware/jsr.json

@@ -5,6 +5,8 @@ Combines [Electricity Maps](https://electricitymaps.com) (global grid carbon int
 
 ## Packages
 
+_version numbers are synced across packages_
+
 - [`worker/`](worker) - the Cloudflare Worker API (Hono + `@hono/zod-openapi`), host-agnostic core
   with a thin Cloudflare-specific adapter in `src/platform/cloudflare.ts`.
 - [`packages/grid-aware/`](packages/grid-aware) - `@web-components/grid-aware` on JSR, a small
@@ -48,8 +50,10 @@ differently once a custom domain is configured.
 
 ### Publishing the browser package
 
-Requires the `web-components` scope on jsr.io and (for CI) that scope's GitHub repo linked as a
-Trusted Publisher. Locally:
+Requires the `web-components` scope on jsr.io and that scope's GitHub repo linked as a Trusted
+Publisher. Publishing is automatic: bump the version in root `package.json` and push to `main` (see
+Versioning below) - CI tags the release, and `npx jsr publish` runs from there. To publish locally
+instead:
 
 ```
 cd packages/grid-aware
@@ -58,9 +62,13 @@ npx jsr publish
 
 ## Versioning
 
-One version number covers the whole repo. Bump it in all of these together: root `package.json`,
-`worker/package.json`, `packages/grid-aware/package.json`, `packages/grid-aware/jsr.json`, the
-OpenAPI `info.version` in `worker/src/app.ts`, and the git tag / GitHub release used to publish.
+Root `package.json`'s `version` is the single source of truth for the whole repo. `npm run
+generate` (run in CI, and in the pre-commit hook) copies it into `worker/package.json`,
+`packages/grid-aware/package.json`, and `packages/grid-aware/jsr.json` via `scripts/sync-version.mjs`;
+the OpenAPI `info.version` in `worker/src/app.ts` reads `worker/package.json` directly. So bumping
+the version only means editing root `package.json` and committing the files the pre-commit hook
+regenerates. Pushing that to `main` makes CI's `release` job cut the matching git tag / GitHub
+release automatically, which triggers the JSR publish.
 
 ## License
 

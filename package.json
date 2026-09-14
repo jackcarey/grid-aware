@@ -8,9 +8,10 @@
   ],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
+    "sync-version": "node scripts/sync-version.mjs",
     "generate:openapi": "npm run generate:openapi --workspace worker",
     "generate:client": "npm run generate:client --workspace packages/grid-aware",
-    "generate": "npm run generate:openapi && npm run generate:client",
+    "generate": "npm run sync-version && npm run generate:openapi && npm run generate:client",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
     "dev": "npm run dev --workspace worker"

@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import packageJson from "../package.json";
 import { ApiError, errorBody } from "./errors.js";
 import { createAllowlistMiddleware } from "./middleware/allowlist.js";
 import { createRateLimitMiddleware } from "./middleware/rateLimit.js";
@@ -25,7 +26,7 @@ export function createApp(deps: AppDeps): OpenAPIHono<AppEnv> {
     openapi: "3.0.0",
     info: {
       title: "grid-aware",
-      version: "1.1.0",
+      version: packageJson.version,
       description:
         "Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API.",
     },
