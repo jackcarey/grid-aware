@@ -29,6 +29,15 @@ export interface Fallback {
   reason: string;
 }
 
+export interface ForecastPoint {
+  datetime: string;
+  validTo?: string;
+  value: number | null;
+  type: CarbonIntensity["type"];
+  band: Band;
+  generationMix?: GenerationMixEntry[];
+}
+
 export interface GridIntensityResponse {
   source: "electricitymaps" | "neso";
   location: RequestedLocation;
@@ -36,6 +45,8 @@ export interface GridIntensityResponse {
   validTo?: string;
   carbonIntensity: CarbonIntensity;
   generationMix?: GenerationMixEntry[];
+  /** Absent for horizon=latest, which has no series to show. */
+  forecast?: ForecastPoint[];
   fallback?: Fallback;
 }
 

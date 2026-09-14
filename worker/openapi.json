@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "grid-aware",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "description": "Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API."
   },
   "components": {
@@ -134,6 +134,13 @@
             },
             "description": "Fuel mix behind this figure. Only returned for NESO regional responses."
           },
+          "forecast": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastPoint"
+            },
+            "description": "Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is \"24h\" or \"48h\"."
+          },
           "fallback": {
             "type": "object",
             "properties": {
@@ -152,6 +159,70 @@
           "location",
           "datetime",
           "carbonIntensity"
+        ]
+      },
+      "ForecastPoint": {
+        "type": "object",
+        "properties": {
+          "datetime": {
+            "type": "string",
+            "description": "Start of this period, ISO 8601 UTC."
+          },
+          "validTo": {
+            "type": "string",
+            "description": "End of this period, when known."
+          },
+          "value": {
+            "type": "number",
+            "nullable": true,
+            "description": "The carbon intensity figure, in `unit`. `null` when `band` is \"unknown\"."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "actual",
+              "forecast",
+              "estimated",
+              "unknown"
+            ]
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "low",
+              "moderate",
+              "high",
+              "very-high",
+              "unknown"
+            ],
+            "example": "moderate",
+            "description": "Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data, see `fallback.reason`."
+          },
+          "generationMix": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fuel": {
+                  "type": "string"
+                },
+                "percentage": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "fuel",
+                "percentage"
+              ]
+            },
+            "description": "Fuel mix for this period. Only present for NESO regional forecasts."
+          }
+        },
+        "required": [
+          "datetime",
+          "value",
+          "type",
+          "band"
         ]
       },
       "Error": {

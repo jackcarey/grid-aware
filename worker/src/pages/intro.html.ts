@@ -9,9 +9,16 @@ export const introHtml = `<h1>grid-aware</h1>
 </p>
 
 <p id="live-intensity">Current grid intensity: <strong id="live-intensity-value">loading&hellip;</strong></p>
+<p id="live-mix"></p>
+<details>
+  <summary>Full API response</summary>
+  <pre id="live-response">loading&hellip;</pre>
+</details>
 <script type="module">
   import { initGridAware } from "/grid-aware/index.js";
   const valueEl = document.getElementById("live-intensity-value");
+  const mixEl = document.getElementById("live-mix");
+  const responseEl = document.getElementById("live-response");
   const liveQueryEl = document.getElementById("live-query");
   initGridAware({
     apiBaseUrl: location.origin,
@@ -20,6 +27,11 @@ export const introHtml = `<h1>grid-aware</h1>
     mapBand: (data) => {
       const where = data.location.region.name ?? data.location.zone ?? "your area";
       valueEl.textContent = where + ": " + data.carbonIntensity.value + " gCO2eq/kWh (" + data.carbonIntensity.band + ")";
+      // generationMix is only ever present for NESO regional responses.
+      mixEl.textContent = data.generationMix
+        ? "Generation mix: " + data.generationMix.map((entry) => entry.fuel + " " + entry.percentage + "%").join(", ")
+        : "";
+      responseEl.textContent = JSON.stringify(data, null, 2);
       if (liveQueryEl) {
         liveQueryEl.textContent = "zone=" + data.location.zone;
       }
@@ -34,7 +46,12 @@ export const introHtml = `<h1>grid-aware</h1>
 </script>
 
 <h2>Try it</h2>
-<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?<span id="live-query">zone=FR</span>'</pre>
+<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?<span id="live-query">zone=FR</span>' \\
+  -H 'Origin: https://your-allowed-site.example'</pre>
+<p>
+  Data endpoints (<code>/v1/*</code>) require the calling origin to be on this deployment's
+  allowlist, to protect its own Electricity Maps quota - <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> to have yours added or <a href="https://github.com/jackcarey/grid-aware">deploy the code yourself</a>.
+</p>
 
 <h2>Use it on a page</h2>
 <p>

@@ -1,1 +1,2 @@
 ELECTRICITY_MAPS_TOKEN=your-electricity-maps-token
+ALLOWED_ORIGINS=http://localhost:8787,https://example.com
