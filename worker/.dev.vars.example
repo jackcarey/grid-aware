@@ -1,2 +1,3 @@
 ELECTRICITY_MAPS_TOKEN=your-electricity-maps-token
+# comma-separated; "https://*.example.com" allows any subdomain but not example.com itself
 ALLOWED_ORIGINS=http://localhost:8787,https://example.com

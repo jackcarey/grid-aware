@@ -58,4 +58,35 @@ describe("createAllowlistMiddleware", () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it("allows a subdomain matching a wildcard entry", async () => {
+    const app = buildApp(["https://*.example.com"]);
+    const res = await app.request("/", { headers: { Origin: "https://app.example.com" } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://app.example.com");
+  });
+
+  it("allows a nested subdomain matching a wildcard entry", async () => {
+    const app = buildApp(["https://*.example.com"]);
+    const res = await app.request("/", { headers: { Origin: "https://a.b.example.com" } });
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects the apex domain when only a wildcard entry is allowed", async () => {
+    const app = buildApp(["https://*.example.com"]);
+    const res = await app.request("/", { headers: { Origin: "https://example.com" } });
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects a lookalike domain that merely ends with the wildcard suffix", async () => {
+    const app = buildApp(["https://*.example.com"]);
+    const res = await app.request("/", { headers: { Origin: "https://evilexample.com" } });
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects a mismatched scheme for a wildcard entry", async () => {
+    const app = buildApp(["https://*.example.com"]);
+    const res = await app.request("/", { headers: { Origin: "http://app.example.com" } });
+    expect(res.status).toBe(403);
+  });
 });
