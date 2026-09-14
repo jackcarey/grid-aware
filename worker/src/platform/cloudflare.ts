@@ -1,9 +1,11 @@
 import { createApp } from "../app.js";
+import { parseAllowedOrigins } from "../config.js";
 import { toOutwardPostcode } from "../geo.js";
 import type { AppDeps, CacheStore } from "../ports.js";
 
 export interface Env {
   ELECTRICITY_MAPS_TOKEN?: string;
+  ALLOWED_ORIGINS?: string;
   GB_REGIONAL_RATE_LIMITER: RateLimit;
   API_RATE_LIMITER: RateLimit;
   ASSETS: Fetcher;
@@ -68,6 +70,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const deps: AppDeps = {
       electricityMapsToken: env.ELECTRICITY_MAPS_TOKEN,
+      allowedOrigins: parseAllowedOrigins(env.ALLOWED_ORIGINS),
       getCountry,
       getPostcode,
       getCity,

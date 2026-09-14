@@ -8,6 +8,7 @@ const ALLOWED_ORIGIN = "https://example.com";
 function buildDeps(overrides: Partial<AppDeps> = {}): AppDeps {
   return {
     electricityMapsToken: "test-token",
+    allowedOrigins: [ALLOWED_ORIGIN],
     getCountry: () => "GB",
     getPostcode: () => undefined,
     getCity: () => undefined,
@@ -34,32 +35,15 @@ describe("app: public routes", () => {
   });
 });
 
-describe("app: /v1/intensity", () => {
-  it("serves NESO national data for a caller with no Origin/Referer", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              data: [
-                {
-                  from: "2026-01-01T00:00Z",
-                  to: "2026-01-01T00:30Z",
-                  intensity: { actual: 100, forecast: 100, index: "moderate" },
-                },
-              ],
-            }),
-            { status: 200 },
-          ),
-      ),
-    );
-
+describe("app: /v1/intensity allowlist", () => {
+  it("rejects a request with no Origin/Referer", async () => {
     const app = createApp(buildDeps());
     const res = await app.request("/v1/intensity?zone=GB");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
+});
 
+describe("app: /v1/intensity", () => {
   it("serves NESO national data for an allowed UK caller", async () => {
     vi.stubGlobal(
       "fetch",
@@ -729,8 +713,162 @@ describe("app: /v1/intensity", () => {
   });
 });
 
-describe("app: /v1/zones", () => {
-  it("proxies the zone list for any origin, with no allowlist check", async () => {
+describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
+  it("includes a forecast array of every NESO national period in the window", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  from: "2026-01-01T00:00Z",
+                  to: "2026-01-01T00:30Z",
+                  intensity: { forecast: 90, index: "moderate" },
+                },
+                {
+                  from: "2026-01-01T00:30Z",
+                  to: "2026-01-01T01:00Z",
+                  intensity: { forecast: 150, index: "high" },
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/intensity?zone=GB&horizon=24h", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      forecast?: { datetime: string; value: number | null; band: string }[];
+    };
+    expect(body.forecast).toEqual([
+      { datetime: "2026-01-01T00:00Z", validTo: "2026-01-01T00:30Z", value: 90, type: "forecast", band: "moderate" },
+      { datetime: "2026-01-01T00:30Z", validTo: "2026-01-01T01:00Z", value: 150, type: "forecast", band: "high" },
+    ]);
+  });
+
+  it("includes a forecast array of every NESO regional period in the window", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  regionid: 13,
+                  dnoregion: "London",
+                  shortname: "London",
+                  data: [
+                    {
+                      from: "2026-01-01T00:00Z",
+                      to: "2026-01-01T00:30Z",
+                      intensity: { forecast: 90, index: "moderate" },
+                      generationmix: [{ fuel: "wind", perc: 30 }],
+                    },
+                    {
+                      from: "2026-01-01T00:30Z",
+                      to: "2026-01-01T01:00Z",
+                      intensity: { forecast: 150, index: "high" },
+                      generationmix: [{ fuel: "gas", perc: 40 }],
+                    },
+                  ],
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    const app = createApp(buildDeps({ getCountry: () => "GB", getPostcode: () => "SW1A" }));
+    const res = await app.request("/v1/intensity?horizon=48h", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      forecast?: { datetime: string; generationMix?: { fuel: string; percentage: number }[] }[];
+    };
+    expect(body.forecast).toHaveLength(2);
+    expect(body.forecast?.[1]?.generationMix).toEqual([{ fuel: "gas", percentage: 40 }]);
+  });
+
+  it("includes a forecast array of every Electricity Maps entry in the window", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              zone: "FR",
+              forecast: [
+                { datetime: "2026-01-01T01:00:00.000Z", carbonIntensity: 40 },
+                { datetime: "2026-01-01T02:00:00.000Z", carbonIntensity: 400 },
+              ],
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/intensity?zone=FR&horizon=24h", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { forecast?: { band: string }[] };
+    expect(body.forecast).toEqual([
+      { datetime: "2026-01-01T01:00:00.000Z", value: 40, type: "forecast", band: "low" },
+      { datetime: "2026-01-01T02:00:00.000Z", value: 400, type: "forecast", band: "high" },
+    ]);
+  });
+
+  it("omits the forecast array for horizon=latest", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  from: "2026-01-01T00:00Z",
+                  to: "2026-01-01T00:30Z",
+                  intensity: { actual: 100, forecast: 100, index: "moderate" },
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/intensity?zone=GB", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { forecast?: unknown };
+    expect(body.forecast).toBeUndefined();
+  });
+});
+
+describe("app: /v1/zones allowlist", () => {
+  it("rejects a disallowed origin", async () => {
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/zones", {
+      headers: { Origin: "https://evil.example" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("proxies the zone list for an allowed origin", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -742,9 +880,9 @@ describe("app: /v1/zones", () => {
     );
     const app = createApp(buildDeps());
     const res = await app.request("/v1/zones", {
-      headers: { Origin: "https://anywhere.example" },
+      headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
   });
 });

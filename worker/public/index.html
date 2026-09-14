@@ -61,7 +61,12 @@
 </script>
 
 <h2>Try it</h2>
-<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?<span id="live-query">zone=FR</span>'</pre>
+<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?<span id="live-query">zone=FR</span>' \
+  -H 'Origin: https://your-allowed-site.example'</pre>
+<p>
+  Data endpoints (<code>/v1/*</code>) require the calling origin to be on this deployment's
+  allowlist, to protect its own Electricity Maps quota - <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> to have yours added or <a href="https://github.com/jackcarey/grid-aware">deploy the code yourself</a>.
+</p>
 
 <h2>Use it on a page</h2>
 <p>
@@ -127,6 +132,17 @@
     fuel: string
     percentage: number
   }[]
+  forecast?: {
+    datetime: string
+    validTo?: string
+    value: number
+    type: "actual" | "forecast" | "estimated" | "unknown"
+    band: "low" | "moderate" | "high" | "very-high" | "unknown"
+    generationMix?: {
+      fuel: string
+      percentage: number
+    }[]
+  }[]
   fallback?: {
     reason: string
   }
@@ -166,6 +182,25 @@
   fuel: string
   percentage: number
 }[]</pre></td><td>Fuel mix behind this figure. Only returned for NESO regional responses.</td></tr>
+<tr><td><code>forecast</code></td><td><pre>{
+  datetime: string
+  validTo?: string
+  value: number
+  type: "actual" | "forecast" | "estimated" | "unknown"
+  band: "low" | "moderate" | "high" | "very-high" | "unknown"
+  generationMix?: {
+    fuel: string
+    percentage: number
+  }[]
+}[]</pre></td><td>Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is "24h" or "48h".</td></tr>
+<tr><td><code>forecast.datetime</code></td><td><pre>string</pre></td><td>Start of this period, ISO 8601 UTC.</td></tr>
+<tr><td><code>forecast.validTo</code></td><td><pre>string</pre></td><td>End of this period, when known.</td></tr>
+<tr><td><code>forecast.value</code></td><td><pre>number</pre></td><td>The carbon intensity figure, in `unit`. `null` when `band` is "unknown".</td></tr>
+<tr><td><code>forecast.band</code></td><td><pre>"low" | "moderate" | "high" | "very-high" | "unknown"</pre></td><td>Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.</td></tr>
+<tr><td><code>forecast.generationMix</code></td><td><pre>{
+  fuel: string
+  percentage: number
+}[]</pre></td><td>Fuel mix for this period. Only present for NESO regional forecasts.</td></tr>
 <tr><td><code>fallback</code></td><td><pre>{
   reason: string
 }</pre></td><td>Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed and `band`/`type` fell back to "unknown".</td></tr></tbody>

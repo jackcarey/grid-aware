@@ -5,6 +5,7 @@ export interface CacheStore {
 
 export interface AppDeps {
   electricityMapsToken: string | undefined;
+  allowedOrigins: readonly string[];
   getCountry(request: Request): string | undefined;
   /** UK outward postcode (e.g. "SW1A") derived from the edge's geolocation, when available. */
   getPostcode(request: Request): string | undefined;
@@ -45,6 +46,7 @@ export function createInMemoryCacheStore(): CacheStore {
 export function createNoopAppDeps(overrides: Partial<AppDeps> = {}): AppDeps {
   return {
     electricityMapsToken: undefined,
+    allowedOrigins: [],
     getCountry: () => undefined,
     getPostcode: () => undefined,
     getCity: () => undefined,

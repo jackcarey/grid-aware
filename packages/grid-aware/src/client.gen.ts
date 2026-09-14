@@ -177,10 +177,33 @@ export interface components {
                 fuel: string;
                 percentage: number;
             }[];
+            /** @description Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is "24h" or "48h". */
+            forecast?: components["schemas"]["ForecastPoint"][];
             /** @description Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed and `band`/`type` fell back to "unknown". */
             fallback?: {
                 reason: string;
             };
+        };
+        ForecastPoint: {
+            /** @description Start of this period, ISO 8601 UTC. */
+            datetime: string;
+            /** @description End of this period, when known. */
+            validTo?: string;
+            /** @description The carbon intensity figure, in `unit`. `null` when `band` is "unknown". */
+            value: number | null;
+            /** @enum {string} */
+            type: "actual" | "forecast" | "estimated" | "unknown";
+            /**
+             * @description Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.
+             * @example moderate
+             * @enum {string}
+             */
+            band: "low" | "moderate" | "high" | "very-high" | "unknown";
+            /** @description Fuel mix for this period. Only present for NESO regional forecasts. */
+            generationMix?: {
+                fuel: string;
+                percentage: number;
+            }[];
         };
         Error: {
             error: {

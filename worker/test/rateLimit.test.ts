@@ -8,6 +8,7 @@ import { createInMemoryCacheStore } from "../src/ports.js";
 function buildApp(isOverApiRateLimit: () => Promise<boolean>): Hono<AppEnv> {
   const deps: AppDeps = {
     electricityMapsToken: undefined,
+    allowedOrigins: [],
     getCountry: () => undefined,
     getPostcode: () => undefined,
     getCity: () => undefined,

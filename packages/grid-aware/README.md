@@ -67,6 +67,22 @@ that window reuses the cached data instead of hitting the network. Pass `0` to a
 at the `maxAgeMs` cadence. Set it to `false` to only fetch on load and on your own explicit
 `refresh()` calls.
 
+## Fetching data directly
+
+For anything beyond driving `data-grid-aware`, use the typed client:
+
+```ts
+import { createGridAwareClient } from "@web-components/grid-aware";
+
+const client = createGridAwareClient("https://your-worker.example.workers.dev");
+
+const current = await client.getCurrentIntensity({ zone: "FR" });
+const forecast = await client.getForecast({ zone: "FR", horizon: "24h" }); // default horizon: "24h"
+```
+
+Both return a`GridIntensityResponse` but `getForecast`'s response has its
+`forecast` array populated with one entry per period (30 minutes for NESO, 1 hour for Electricity Maps)
+
 ## Regenerating the API client
 
 ```
@@ -74,4 +90,4 @@ npm run generate:client
 ```
 
 Runs `openapi-typescript` against `../../worker/openapi.json` and writes `src/client.gen.ts`.
-Regenerate whenever the worker's `/v1/intensity` shape changes.
+Use this to regenerate whenever the worker's changes.

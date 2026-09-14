@@ -1,8 +1,11 @@
-import type { components } from "./client.gen.js";
-import { createGridAwareClient } from "./client.js";
+import { createGridAwareClient, type GridIntensityData } from "./client.js";
 
-/** `/v1/intensity` API response. */
-export type GridIntensityData = components["schemas"]["GridIntensityResponse"];
+export {
+  createGridAwareClient,
+  type GridAwareClient,
+  type GridIntensityData,
+  type IntensityQuery,
+} from "./client.js";
 
 export interface GridAwareOptions {
   /** Your worker's URL. Required. */
@@ -172,23 +175,14 @@ export function initGridAware(options: GridAwareOptions): GridAwareHandle {
       return;
     }
 
-    let data: GridIntensityData | undefined;
-    let error: unknown;
+    let data: GridIntensityData;
     try {
-      ({ data, error } = await client.GET("/v1/intensity", {
-        params: {
-          query: {
-            zone: options.zone,
-            postcode: options.postcode,
-            regionid: options.regionid,
-          },
-        },
-      }));
-    } catch (fetchError) {
-      error = fetchError;
-    }
-
-    if (error || !data) {
+      data = await client.getCurrentIntensity({
+        zone: options.zone,
+        postcode: options.postcode,
+        regionid: options.regionid,
+      });
+    } catch (error) {
       console.error("grid-aware: failed to fetch intensity", error);
       applyBand(unknownIntensityData());
       return;

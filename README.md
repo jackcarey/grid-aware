@@ -24,9 +24,11 @@ npm test
 
 ```
 cd worker
-cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN
+cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN and ALLOWED_ORIGINS
 npx wrangler dev
 ```
+
+`/v1/*` requests need a matching `Origin`/`Referer` header.
 
 ### Deploying
 
@@ -34,6 +36,7 @@ npx wrangler dev
 cd worker
 npx wrangler login                        # once
 npx wrangler secret put ELECTRICITY_MAPS_TOKEN
+npx wrangler secret put ALLOWED_ORIGINS
 npx wrangler deploy
 ```
 

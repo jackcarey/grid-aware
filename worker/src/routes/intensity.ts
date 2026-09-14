@@ -179,13 +179,7 @@ async function resolveResponse(
 
   if (target.kind === "neso-national") {
     const raw = await neso.getNationalIntensity(horizon);
-    const period = raw.data[0];
-    if (!period)
-      throw new UpstreamError(
-        "NESO returned no national intensity data",
-        "neso",
-      );
-    return normalizeNesoNational(period, {
+    return normalizeNesoNational(raw.data, {
       zone: "GB",
       region: regionInfoFromNation(detectedNation),
     });
@@ -209,10 +203,9 @@ async function resolveResponse(
       await neso.getRegionalByRegionId(target.regionId as number, horizon)
     ).data[0];
   }
-  const period = region?.data[0];
-  if (!region || !period)
+  if (!region)
     throw new UpstreamError("NESO returned no regional intensity data", "neso");
-  return normalizeNesoRegional(region, period, {
+  return normalizeNesoRegional(region, {
     zone: "GB",
     region: { unknown: true }, // overwritten below with the actual DNO region
   });

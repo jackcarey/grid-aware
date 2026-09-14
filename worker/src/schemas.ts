@@ -6,6 +6,28 @@ export const BandSchema = z.enum(["low", "moderate", "high", "very-high", "unkno
     "Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data, see `fallback.reason`.",
 });
 
+export const ForecastPointSchema = z
+  .object({
+    datetime: z.string().openapi({ description: "Start of this period, ISO 8601 UTC." }),
+    validTo: z.string().optional().openapi({ description: "End of this period, when known." }),
+    value: z
+      .number()
+      .nullable()
+      .openapi({ description: "The carbon intensity figure, in `unit`. `null` when `band` is \"unknown\"." }),
+    type: z.enum(["actual", "forecast", "estimated", "unknown"]),
+    band: BandSchema,
+    generationMix: z
+      .array(
+        z.object({
+          fuel: z.string(),
+          percentage: z.number(),
+        }),
+      )
+      .optional()
+      .openapi({ description: "Fuel mix for this period. Only present for NESO regional forecasts." }),
+  })
+  .openapi("ForecastPoint");
+
 export const GridIntensityResponseSchema = z
   .object({
     source: z.enum(["electricitymaps", "neso"]).openapi({
@@ -60,6 +82,13 @@ export const GridIntensityResponseSchema = z
       )
       .optional()
       .openapi({ description: "Fuel mix behind this figure. Only returned for NESO regional responses." }),
+    forecast: z
+      .array(ForecastPointSchema)
+      .optional()
+      .openapi({
+        description:
+          "Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is \"24h\" or \"48h\".",
+      }),
     fallback: z
       .object({
         reason: z.string(),
