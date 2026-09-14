@@ -25,7 +25,7 @@ export function createApp(deps: AppDeps): OpenAPIHono<AppEnv> {
     openapi: "3.0.0",
     info: {
       title: "grid-aware",
-      version: "1.0.1",
+      version: "1.1.0",
       description:
         "Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API.",
     },
