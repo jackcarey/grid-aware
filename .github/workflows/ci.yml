@@ -3,8 +3,6 @@ name: CI
 on:
   push:
   pull_request:
-  release:
-    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -35,9 +33,39 @@ jobs:
       - run: npm run generate
       - run: npm test
 
-  publish-jsr:
+  release:
     needs: [build, test]
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      released: ${{ steps.check.outputs.released }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: check
+        run: |
+          TAG="v$(node -p "require('./packages/grid-aware/package.json').version")"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ steps.check.outputs.tag }}" --title "${{ steps.check.outputs.tag }}" --generate-notes
+
+  publish-jsr:
+    needs: [build, test, release]
+    if: always() && needs.build.result == 'success' && needs.test.result == 'success' && needs.release.result == 'success' && needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
