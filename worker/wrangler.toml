@@ -3,6 +3,9 @@ main = "src/platform/cloudflare.ts"
 compatibility_date = "2026-08-22"
 workers_dev = true
 
+# Stop variables and secrets in the CF UI being wiped out when this file is committed.
+keep_vars = true
+
 routes = [
   { pattern = "grid.jackcarey.co.uk", custom_domain = true },
   { pattern = "grid-aware.jackcarey.co.uk", custom_domain = true }
