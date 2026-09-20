@@ -9,7 +9,10 @@ export const introHtml = `<h1>grid-aware</h1>
 </p>
 
 <p id="live-intensity">Current grid intensity: <strong id="live-intensity-value">loading&hellip;</strong></p>
-<p id="live-mix"></p>
+<div id="live-mix" hidden>
+  <p>Generation mix:</p>
+  <ol id="live-mix-list"><li>unknown</li></ol>
+</div>
 <details>
   <summary>Full API response</summary>
   <pre id="live-response">loading&hellip;</pre>
@@ -18,6 +21,7 @@ export const introHtml = `<h1>grid-aware</h1>
   import { initGridAware } from "/grid-aware/index.js";
   const valueEl = document.getElementById("live-intensity-value");
   const mixEl = document.getElementById("live-mix");
+  const mixListEl = document.getElementById("live-mix-list");
   const responseEl = document.getElementById("live-response");
   const liveQueryEl = document.getElementById("live-query");
   initGridAware({
@@ -28,9 +32,15 @@ export const introHtml = `<h1>grid-aware</h1>
       const where = data.location.region.name ?? data.location.zone ?? "your area";
       valueEl.textContent = where + ": " + data.carbonIntensity.value + " gCO2eq/kWh (" + data.carbonIntensity.band + ")";
       // generationMix is only ever present for NESO regional responses.
-      mixEl.textContent = data.generationMix
-        ? "Generation mix: " + data.generationMix.map((entry) => entry.fuel + " " + entry.percentage + "%").join(", ")
-        : "";
+      const mix = [...(data.generationMix ?? [])].sort((a, b) => b.percentage - a.percentage);
+      mixEl.hidden = mix.length === 0;
+      mixListEl.replaceChildren(
+        ...mix.map((entry) => {
+          const li = document.createElement("li");
+          li.textContent = entry.fuel + " " + entry.percentage + "%";
+          return li;
+        }),
+      );
       responseEl.textContent = JSON.stringify(data, null, 2);
       if (liveQueryEl) {
         liveQueryEl.textContent = "zone=" + data.location.zone;
