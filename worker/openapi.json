@@ -14,7 +14,8 @@
             "type": "string",
             "enum": [
               "electricitymaps",
-              "neso"
+              "neso",
+              "co2js"
             ],
             "example": "neso",
             "description": "Which upstream answered this request"
@@ -377,26 +378,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ZoneList"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "This deployment has no Electricity Maps token configured",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Electricity Maps failed to respond",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

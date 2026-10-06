@@ -39,7 +39,7 @@ export interface ForecastPoint {
 }
 
 export interface GridIntensityResponse {
-  source: "electricitymaps" | "neso";
+  source: "electricitymaps" | "neso" | "co2js";
   location: RequestedLocation;
   datetime: string;
   validTo?: string;

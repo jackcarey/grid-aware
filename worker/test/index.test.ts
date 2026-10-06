@@ -617,7 +617,7 @@ describe("app: /v1/intensity", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("falls back to an unknown reading instead of erroring when Electricity Maps is unreachable", async () => {
+  it("falls back to the CO2.js annual average when Electricity Maps is unreachable", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -634,12 +634,34 @@ describe("app: /v1/intensity", () => {
       carbonIntensity: { value: number | null; band: string };
       fallback?: { reason: string };
     };
-    expect(body.carbonIntensity.value).toBeNull();
-    expect(body.carbonIntensity.band).toBe("unknown");
+    expect(body.carbonIntensity.value).toBe(31);
+    expect(body.carbonIntensity.band).toBe("low");
     expect(body.fallback?.reason).toMatch(/Electricity Maps/);
   });
 
-  it("does not cache an unknown fallback, so the next request retries upstream", async () => {
+  it("serves CO2.js data when no token is configured", async () => {
+    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
+    const res = await app.request("/v1/intensity?zone=DE", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    const body = (await res.json()) as { source: string; carbonIntensity: { value: number } };
+    expect(body.source).toBe("co2js");
+    expect(body.carbonIntensity.value).toBe(342);
+  });
+
+  it("falls back from NESO through Electricity Maps to CO2.js", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/intensity?zone=GB", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    const body = (await res.json()) as { source: string; fallback?: { reason: string } };
+    expect(body.source).toBe("co2js");
+    expect(body.fallback?.reason).toMatch(/NESO.*Electricity Maps responded with 503/);
+  });
+
+  it("does not cache a fallback, so the next request retries upstream", async () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new Error("network down"))
@@ -662,7 +684,7 @@ describe("app: /v1/intensity", () => {
     const firstBody = (await first.json()) as {
       carbonIntensity: { band: string };
     };
-    expect(firstBody.carbonIntensity.band).toBe("unknown");
+    expect(firstBody.carbonIntensity.band).toBe("low");
 
     const second = await app.request("/v1/intensity?zone=FR", {
       headers: { Origin: ALLOWED_ORIGIN },
@@ -884,5 +906,14 @@ describe("app: /v1/zones allowlist", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+  });
+
+  it("serves the CO2.js zone list when no token is configured", async () => {
+    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
+    const res = await app.request("/v1/zones", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.GB).toEqual({ zoneName: "Great Britain" });
   });
 });
