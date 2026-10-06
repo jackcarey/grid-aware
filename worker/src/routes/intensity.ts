@@ -18,6 +18,7 @@ import {
   normalizeNesoRegional,
 } from "../normalize.js";
 import type { AppEnv, CacheStore } from "../ports.js";
+import * as co2js from "../providers/co2js.js";
 import * as electricityMaps from "../providers/electricityMaps.js";
 import * as neso from "../providers/neso.js";
 import {
@@ -148,8 +149,10 @@ async function resolveResponse(
 ): Promise<GridIntensityResponse> {
   if (target.kind === "electricitymaps") {
     if (!electricityMapsToken) {
-      throw new BadRequestError(
+      // So tokenless deployments fall back to CO2.js.
+      throw new UpstreamError(
         "ELECTRICITY_MAPS_TOKEN is not configured on this deployment",
+        "electricitymaps",
       );
     }
     // Electricity Maps zones have no GB DNO region
@@ -333,9 +336,31 @@ export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
       // Caller-caused errors (bad config, forbidden) stay as errors; only upstream
       // failure falls back, and throwing before withEdgeCache resolves keeps it uncached.
       if (err instanceof ApiError && !(err instanceof UpstreamError)) throw err;
-      const reason =
+      let reason =
         err instanceof Error ? err.message : "Unknown upstream error";
-      response = c.json(unknownIntensityResponse(target, reason), 200);
+      if (target.kind !== "electricitymaps" && deps.electricityMapsToken) {
+        const gb = {
+          kind: "electricitymaps",
+          zone: "GB",
+          fallbackReason: `${reason}; served via Electricity Maps' GB zone instead`,
+        } as const;
+        const body = await resolveResponse(
+          gb,
+          horizon,
+          deps.electricityMapsToken,
+          detectedNation,
+          deps.cache,
+          allRegionsCacheKey,
+          deps.isOverRegionalRateLimit,
+        ).catch((emErr: Error) => void (reason += `; ${emErr.message}`));
+        if (body) return c.json(body, 200) as never;
+      }
+      const zone = target.kind === "electricitymaps" ? target.zone : "GB";
+      response = c.json(
+        co2js.annualIntensity(zone, horizon, reason) ??
+          unknownIntensityResponse(target, reason),
+        200,
+      );
     }
     return response as never;
   });

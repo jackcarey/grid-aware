@@ -30,7 +30,7 @@ export const ForecastPointSchema = z
 
 export const GridIntensityResponseSchema = z
   .object({
-    source: z.enum(["electricitymaps", "neso"]).openapi({
+    source: z.enum(["electricitymaps", "neso", "co2js"]).openapi({
       example: "neso",
       description: "Which upstream answered this request",
     }),

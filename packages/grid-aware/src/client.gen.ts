@@ -91,24 +91,6 @@ export interface paths {
                         "application/json": components["schemas"]["ZoneList"];
                     };
                 };
-                /** @description This deployment has no Electricity Maps token configured */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-                /** @description Electricity Maps failed to respond */
-                502: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
             };
         };
         put?: never;
@@ -129,7 +111,7 @@ export interface components {
              * @example neso
              * @enum {string}
              */
-            source: "electricitymaps" | "neso";
+            source: "electricitymaps" | "neso" | "co2js";
             /** @description Echoes back where this response is about, so you never have to re-parse the request. */
             location: {
                 /** @description Electricity Maps zone code (always "GB" for NESO responses). */

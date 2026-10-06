@@ -132,7 +132,7 @@
   <h4>Responses</h4>
   <h4><code>200</code> - Normalized grid carbon intensity for the requested location</h4>
 <pre>{
-  source: "electricitymaps" | "neso"
+  source: "electricitymaps" | "neso" | "co2js"
   location: {
     zone: string
     region: {
@@ -171,7 +171,7 @@
 }</pre>
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
-<tbody><tr><td><code>source</code></td><td><pre>"electricitymaps" | "neso"</pre></td><td>Which upstream answered this request</td></tr>
+<tbody><tr><td><code>source</code></td><td><pre>"electricitymaps" | "neso" | "co2js"</pre></td><td>Which upstream answered this request</td></tr>
 <tr><td><code>location</code></td><td><pre>{
   zone: string
   region: {
@@ -257,22 +257,6 @@
   zoneName?: string
   countryName?: string
 } }</pre>
-
-<h4><code>400</code> - This deployment has no Electricity Maps token configured</h4>
-<pre>{
-  error: {
-    message: string
-    provider?: "electricitymaps" | "neso"
-  }
-}</pre>
-
-<h4><code>502</code> - Electricity Maps failed to respond</h4>
-<pre>{
-  error: {
-    message: string
-    provider?: "electricitymaps" | "neso"
-  }
-}</pre>
 
 </section>
   </main>
