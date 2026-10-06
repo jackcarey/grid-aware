@@ -1,17 +1,18 @@
 // @ts-expect-error no published types
-import { yearly2025 } from "@tgwf/co2/data/electricity-maps";
+import datasets from "@tgwf/co2/data/electricity-maps";
 import { bandFromValue } from "../bands.js";
 import type { GridIntensityResponse, Horizon } from "../types.js";
 import type { ElectricityMapsZones } from "./electricityMaps.js";
-
-const YEAR = 2025; // keep in sync with the import
 
 interface YearlyZone {
   zone: { zoneName?: string; countryName?: string };
   carbonIntensity: { value: number };
 }
 
-const data = yearly2025.data as Record<string, YearlyZone>;
+const YEAR = Math.max(
+  ...Object.keys(datasets).map((key) => Number(key.replace("yearly", ""))),
+);
+const data = datasets[`yearly${YEAR}`].data as Record<string, YearlyZone>;
 
 export function annualIntensity(
   zone: string,
