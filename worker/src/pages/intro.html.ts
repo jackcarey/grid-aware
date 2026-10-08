@@ -2,7 +2,8 @@ export const introHtml = `<h1>grid-aware</h1>
 <p>
   A small API that combines <a href="https://electricitymaps.com">Electricity Maps</a>
   (global) with the UK
-  <a href="https://carbonintensity.org.uk">NESO Carbon Intensity API</a> (DNO region) behind one normalized endpoint.
+  <a href="https://carbonintensity.org.uk">NESO Carbon Intensity API</a> (DNO region) behind one normalized endpoint,
+  falling back to Electricity Maps' annual averages via <a href="https://www.thegreenwebfoundation.org/co2-js/">CO2.js</a> when live data is unavailable.
 </p>
 <p>
   Read about the scope and caveats on the <a href="https://jackcarey.co.uk/projects/grid-aware/">project page</a> and <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> with questions or feedback.

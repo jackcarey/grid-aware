@@ -11,7 +11,8 @@ const route = createRoute({
   responses: {
     200: {
       content: { "application/json": { schema: ZoneListSchema } },
-      description: "Electricity Maps' supported zone list, proxied so clients never need their own token",
+      description:
+        "Electricity Maps' supported zone list, proxied so clients never need their own token. Falls back to the zones in CO2.js's annual dataset when there's no token or Electricity Maps is unreachable.",
     },
   },
   summary: "List Electricity Maps zones",

@@ -68,7 +68,7 @@ export const GridIntensityResponseSchema = z
         unit: z.literal("gCO2eq/kWh"),
         type: z.enum(["actual", "forecast", "estimated", "unknown"]).openapi({
           description:
-            "\"actual\" = measured (NESO national, when available), \"forecast\" = NESO's forward estimate (national fallback and all regional data), \"estimated\" = Electricity Maps' modeled figure, \"unknown\" = an upstream provider failed or returned unusable data.",
+            "\"actual\" = measured (NESO national, when available), \"forecast\" = NESO's forward estimate (national fallback and all regional data), \"estimated\" = Electricity Maps' modeled figure (or its annual average, for CO2.js fallbacks), \"unknown\" = an upstream provider failed or returned unusable data.",
         }),
         band: BandSchema,
       })
@@ -87,7 +87,7 @@ export const GridIntensityResponseSchema = z
       .optional()
       .openapi({
         description:
-          "Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is \"24h\" or \"48h\".",
+          "Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is \"24h\" or \"48h\", and never for CO2.js fallbacks.",
       }),
     fallback: z
       .object({
@@ -96,7 +96,7 @@ export const GridIntensityResponseSchema = z
       .optional()
       .openapi({
         description:
-          "Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed and `band`/`type` fell back to \"unknown\".",
+          "Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: \"co2js\"`), and only report `band`/`type` as \"unknown\" if the zone isn't in that dataset either.",
       }),
   })
   .openapi("GridIntensityResponse");

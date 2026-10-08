@@ -29,7 +29,8 @@
 <p>
   A small API that combines <a href="https://electricitymaps.com">Electricity Maps</a>
   (global) with the UK
-  <a href="https://carbonintensity.org.uk">NESO Carbon Intensity API</a> (DNO region) behind one normalized endpoint.
+  <a href="https://carbonintensity.org.uk">NESO Carbon Intensity API</a> (DNO region) behind one normalized endpoint,
+  falling back to Electricity Maps' annual averages via <a href="https://www.thegreenwebfoundation.org/co2-js/">CO2.js</a> when live data is unavailable.
 </p>
 <p>
   Read about the scope and caveats on the <a href="https://jackcarey.co.uk/projects/grid-aware/">project page</a> and <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> with questions or feedback.
@@ -198,7 +199,7 @@
   band: "low" | "moderate" | "high" | "very-high" | "unknown"
 }</pre></td><td>The carbon intensity figure itself.</td></tr>
 <tr><td><code>carbonIntensity.value</code></td><td><pre>number</pre></td><td>The carbon intensity figure, in `unit`. `null` when `band` is "unknown".</td></tr>
-<tr><td><code>carbonIntensity.type</code></td><td><pre>"actual" | "forecast" | "estimated" | "unknown"</pre></td><td>"actual" = measured (NESO national, when available), "forecast" = NESO's forward estimate (national fallback and all regional data), "estimated" = Electricity Maps' modeled figure, "unknown" = an upstream provider failed or returned unusable data.</td></tr>
+<tr><td><code>carbonIntensity.type</code></td><td><pre>"actual" | "forecast" | "estimated" | "unknown"</pre></td><td>"actual" = measured (NESO national, when available), "forecast" = NESO's forward estimate (national fallback and all regional data), "estimated" = Electricity Maps' modeled figure (or its annual average, for CO2.js fallbacks), "unknown" = an upstream provider failed or returned unusable data.</td></tr>
 <tr><td><code>carbonIntensity.band</code></td><td><pre>"low" | "moderate" | "high" | "very-high" | "unknown"</pre></td><td>Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.</td></tr>
 <tr><td><code>generationMix</code></td><td><pre>{
   fuel: string
@@ -214,7 +215,7 @@
     fuel: string
     percentage: number
   }[]
-}[]</pre></td><td>Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is "24h" or "48h".</td></tr>
+}[]</pre></td><td>Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is "24h" or "48h", and never for CO2.js fallbacks.</td></tr>
 <tr><td><code>forecast.datetime</code></td><td><pre>string</pre></td><td>Start of this period, ISO 8601 UTC.</td></tr>
 <tr><td><code>forecast.validTo</code></td><td><pre>string</pre></td><td>End of this period, when known.</td></tr>
 <tr><td><code>forecast.value</code></td><td><pre>number</pre></td><td>The carbon intensity figure, in `unit`. `null` when `band` is "unknown".</td></tr>
@@ -225,7 +226,7 @@
 }[]</pre></td><td>Fuel mix for this period. Only present for NESO regional forecasts.</td></tr>
 <tr><td><code>fallback</code></td><td><pre>{
   reason: string
-}</pre></td><td>Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed and `band`/`type` fell back to "unknown".</td></tr></tbody>
+}</pre></td><td>Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: "co2js"`), and only report `band`/`type` as "unknown" if the zone isn't in that dataset either.</td></tr></tbody>
 </table>
 <h4><code>400</code> - Missing or invalid query parameters</h4>
 <pre>{
@@ -252,7 +253,7 @@
   <h4>Parameters</h4>
   <p><em>No parameters.</em></p>
   <h4>Responses</h4>
-  <h4><code>200</code> - Electricity Maps' supported zone list, proxied so clients never need their own token</h4>
+  <h4><code>200</code> - Electricity Maps' supported zone list, proxied so clients never need their own token. Falls back to the zones in CO2.js's annual dataset when there's no token or Electricity Maps is unreachable.</h4>
 <pre>{ [key: string]: {
   zoneName?: string
   countryName?: string

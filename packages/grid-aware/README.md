@@ -2,7 +2,8 @@
 
 Sets a `data-grid-aware` attribute (`low` | `moderate` | `high` | `very-high` | `unknown`) on
 `<html>`, reflecting the current grid carbon intensity from a [grid-aware worker](../../worker)
-deployment. `unknown` means the fetch failed or the worker's own upstream provider failed.
+deployment. `unknown` means the fetch failed or every upstream provider the worker tried (including its
+CO2.js annual-average fallback) failed.
 
 ## Drop-in `<script>` tag
 

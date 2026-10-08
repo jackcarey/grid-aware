@@ -1,7 +1,7 @@
 # grid-aware
 
 Combines [Electricity Maps](https://electricitymaps.com) (global grid carbon intensity) with the
-[NESO Carbon Intensity API](https://carbonintensity.org.uk) (UK DNO regions) behind one API, plus a tiny browser package that reflects the current intensity as a `data-grid-aware` attribute on a page. A Cloudflare wrapper is set up, so with no explicit zone/postcode/regionid, the API defaults to its detected location.
+[NESO Carbon Intensity API](https://carbonintensity.org.uk) (UK DNO regions) behind one API, falling back to Electricity Maps' annual averages via [CO2.js](https://www.thegreenwebfoundation.org/co2-js/) when live data is unavailable, plus a tiny browser package that reflects the current intensity as a `data-grid-aware` attribute on a page. A Cloudflare wrapper is set up, so with no explicit zone/postcode/regionid, the API defaults to its detected location.
 
 ## Packages
 
@@ -31,6 +31,11 @@ npx wrangler dev
 ```
 
 `/v1/*` requests need a matching `Origin`/`Referer` header.
+
+`ELECTRICITY_MAPS_TOKEN` is optional. Without it, non-GB zones (and GB when NESO fails) are served
+from CO2.js's bundled annual averages, with `source: "co2js"` and a `fallback.reason`, and
+`/v1/zones` lists CO2.js's zones instead. Those figures are Electricity Maps data under ODbL, so
+the `fallback.reason` text credits them.
 
 ### Deploying
 
