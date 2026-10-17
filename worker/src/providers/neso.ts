@@ -43,6 +43,7 @@ export interface NesoRegionalResponse {
   data: NesoRegion[];
 }
 
+/** Fetches a Carbon Intensity API path as JSON, throwing UpstreamError if it fails. */
 async function get<T>(path: string): Promise<T> {
   let response: Response;
   try {
@@ -58,28 +59,33 @@ async function get<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** Formats a date the way the Carbon Intensity API expects in its URLs. */
 function nesoDatetime(date: Date): string {
   return date.toISOString().slice(0, 16) + "Z";
 }
 
+/** The URL suffix for a forecast horizon, or undefined for the latest period only. */
 function forwardSuffix(horizon: Horizon): "fw24h" | "fw48h" | undefined {
   if (horizon === "24h") return "fw24h";
   if (horizon === "48h") return "fw48h";
   return undefined;
 }
 
+/** Fetches GB national carbon intensity for the horizon. */
 export function getNationalIntensity(horizon: Horizon): Promise<NesoNationalResponse> {
   const suffix = forwardSuffix(horizon);
   if (!suffix) return get<NesoNationalResponse>("/intensity");
   return get<NesoNationalResponse>(`/intensity/${nesoDatetime(new Date())}/${suffix}`);
 }
 
+/** Fetches carbon intensity for all 14 GB regions in one call. */
 export function getRegionalNational(horizon: Horizon): Promise<NesoRegionalResponse> {
   const suffix = forwardSuffix(horizon);
   if (!suffix) return get<NesoRegionalResponse>("/regional");
   return get<NesoRegionalResponse>(`/regional/intensity/${nesoDatetime(new Date())}/${suffix}`);
 }
 
+/** Fetches carbon intensity for the region covering an outward postcode. */
 export function getRegionalByPostcode(
   postcode: string,
   horizon: Horizon,
@@ -92,6 +98,7 @@ export function getRegionalByPostcode(
   );
 }
 
+/** Fetches carbon intensity for one GB region by its NESO ID. */
 export function getRegionalByRegionId(
   regionId: number,
   horizon: Horizon,

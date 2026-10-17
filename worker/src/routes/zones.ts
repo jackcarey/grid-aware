@@ -18,6 +18,7 @@ const route = createRoute({
   summary: "List Electricity Maps zones",
 });
 
+/** Adds the /v1/zones route to the app. */
 export function registerZonesRoute(app: OpenAPIHono<AppEnv>): void {
   app.openapi(route, async (c) => {
     const deps = c.get("deps");

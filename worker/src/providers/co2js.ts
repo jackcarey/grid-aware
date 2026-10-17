@@ -14,6 +14,7 @@ const YEAR = Math.max(
 );
 const data = datasets[`yearly${YEAR}`].data as Record<string, YearlyZone>;
 
+/** Builds a response from Electricity Maps' latest annual average for a zone, or undefined if CO2.js doesn't have that zone. */
 export function annualIntensity(
   zone: string,
   horizon: Horizon,
@@ -36,6 +37,7 @@ export function annualIntensity(
   };
 }
 
+/** Lists the zones in CO2.js's annual dataset. */
 export function listZones(): ElectricityMapsZones {
   return Object.fromEntries(
     Object.entries(data).map(([key, { zone }]) => [

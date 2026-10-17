@@ -29,6 +29,7 @@ export interface ElectricityMapsZone {
 
 export type ElectricityMapsZones = Record<string, ElectricityMapsZone>;
 
+/** How many hours of forecast to request for a horizon. */
 function horizonToHours(horizon: Horizon): number {
   switch (horizon) {
     case "24h":
@@ -40,6 +41,7 @@ function horizonToHours(horizon: Horizon): number {
   }
 }
 
+/** Fetches an Electricity Maps API path as JSON, throwing UpstreamError if it fails. */
 async function get<T>(token: string, path: string, params: Record<string, string>): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) {
@@ -63,10 +65,12 @@ async function get<T>(token: string, path: string, params: Record<string, string
   return (await response.json()) as T;
 }
 
+/** Fetches the latest carbon intensity for a zone. */
 export function getLatestIntensity(token: string, zone: string): Promise<ElectricityMapsLatest> {
   return get<ElectricityMapsLatest>(token, "/carbon-intensity/latest", { zone });
 }
 
+/** Fetches a zone's carbon intensity forecast for the horizon. */
 export function getForecast(
   token: string,
   zone: string,
@@ -78,6 +82,7 @@ export function getForecast(
   });
 }
 
+/** Fetches the list of zones Electricity Maps supports. */
 export function listZones(token: string): Promise<ElectricityMapsZones> {
   return get<ElectricityMapsZones>(token, "/zones", {});
 }

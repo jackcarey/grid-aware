@@ -58,6 +58,7 @@ export type ResolvedTarget =
   | { kind: "neso-regional"; postcode?: string; regionId?: number }
   | { kind: "electricitymaps"; zone: string; fallbackReason?: string };
 
+/** Decides which upstream answers a request, from its subject, source preference and origin. */
 export function resolveIntensityTarget(params: {
   zone?: string;
   postcode?: string;
@@ -138,6 +139,7 @@ async function getSharedAllRegions(
   return (await response.json()) as neso.NesoRegionalResponse;
 }
 
+/** Fetches and normalises the intensity for a resolved target. Throws on upstream failure. */
 async function resolveResponse(
   target: ResolvedTarget,
   horizon: Horizon,
@@ -261,6 +263,7 @@ const route = createRoute({
     "Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).",
 });
 
+/** Adds the /v1/intensity route to the app. */
 export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
   app.openapi(route, async (c) => {
     const { zone, postcode, regionid, horizon, source } = c.req.valid("query");

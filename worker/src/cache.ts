@@ -6,6 +6,7 @@ export const NESO_CACHE_TTL_SECONDS = 30 * 60;
 /** Electricity Maps refreshes hourly; also covers /v1/zones, since it's Electricity Maps data too. */
 export const ELECTRICITY_MAPS_CACHE_TTL_SECONDS = 60 * 60;
 
+/** Returns the cached response for `cacheKey`, or runs `handler` and caches its result if it succeeded. */
 export async function withEdgeCache(
   cacheKey: string,
   ttlSeconds: number,

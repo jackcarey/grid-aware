@@ -4,6 +4,7 @@ import type { ElectricityMapsForecast, ElectricityMapsLatest } from "./providers
 import type { NesoIntensityPeriod, NesoRegion, NesoRegionalPeriod } from "./providers/neso.js";
 import type { ForecastPoint, GridIntensityResponse, RequestedLocation } from "./types.js";
 
+/** Converts Electricity Maps' latest reading into a grid-aware response. */
 export function normalizeElectricityMapsLatest(
   raw: ElectricityMapsLatest,
   location: RequestedLocation,
@@ -23,6 +24,7 @@ export function normalizeElectricityMapsLatest(
   };
 }
 
+/** Converts Electricity Maps' forecast into a grid-aware response, led by its first entry. */
 export function normalizeElectricityMapsForecast(
   raw: ElectricityMapsForecast,
   location: RequestedLocation,
@@ -52,6 +54,7 @@ export function normalizeElectricityMapsForecast(
   };
 }
 
+/** Converts one NESO national period into a forecast point. */
 function nesoForecastPoint(period: NesoIntensityPeriod): ForecastPoint {
   const value = period.intensity.actual ?? period.intensity.forecast;
   return {
@@ -63,6 +66,7 @@ function nesoForecastPoint(period: NesoIntensityPeriod): ForecastPoint {
   };
 }
 
+/** Converts NESO national periods into a grid-aware response, led by the first period. */
 export function normalizeNesoNational(
   periods: readonly NesoIntensityPeriod[],
   location: RequestedLocation,
@@ -93,6 +97,7 @@ export function normalizeNesoNational(
   return response;
 }
 
+/** Converts one NESO regional period into a forecast point, with its fuel mix. */
 function nesoRegionalForecastPoint(period: NesoRegionalPeriod): ForecastPoint {
   return {
     datetime: period.from,
@@ -107,6 +112,7 @@ function nesoRegionalForecastPoint(period: NesoRegionalPeriod): ForecastPoint {
   };
 }
 
+/** Converts a NESO region's periods into a grid-aware response, with the region's ID and name. */
 export function normalizeNesoRegional(
   region: NesoRegion,
   location: RequestedLocation,
