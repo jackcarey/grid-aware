@@ -188,13 +188,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Use /v2/zones. */
+                /** @description 1.x response shape. Use /v2/zones. */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ZoneList"];
+                        "application/json": components["schemas"]["ZoneListV1"];
                     };
                 };
             };
@@ -268,6 +268,8 @@ export interface components {
             /** @description Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is "24h" or "48h", and never for CO2.js fallbacks. */
             forecast?: components["schemas"]["ForecastPoint"][];
             surplus?: components["schemas"]["Surplus"];
+            /** @description Credits for each source used in this response. Keep them with the data if you display or redistribute it. */
+            attribution: components["schemas"]["Attribution"][];
             /** @description Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: "co2js"`), and only report `band`/`type` as "unknown" if the zone isn't in that dataset either. */
             fallback?: {
                 reason: string;
@@ -365,6 +367,19 @@ export interface components {
                 };
             };
         };
+        Attribution: {
+            /** @enum {string} */
+            source: "neso" | "electricitymaps" | "co2js" | "bmrs";
+            /**
+             * @description Credit required by the source's licence or terms.
+             * @example Contains BMRS data © Elexon Limited copyright and database right 2026
+             */
+            text: string;
+            /** @description Licence or terms link. */
+            licence: string;
+            /** @description Data source link. */
+            url: string;
+        };
         Error: {
             error: {
                 message: string;
@@ -434,6 +449,16 @@ export interface components {
             };
         };
         ZoneList: {
+            zones: {
+                [key: string]: {
+                    zoneName?: string;
+                    countryName?: string;
+                };
+            };
+            /** @description Credits for each source used in this response. Keep them with the data if you display or redistribute it. */
+            attribution: components["schemas"]["Attribution"][];
+        };
+        ZoneListV1: {
             [key: string]: {
                 zoneName?: string;
                 countryName?: string;

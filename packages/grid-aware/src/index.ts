@@ -45,6 +45,7 @@ function unknownIntensityData(): GridIntensityData {
       type: "unknown",
       band: "unknown",
     },
+    attribution: [],
     fallback: { reason: "Failed to fetch intensity data" },
   };
 }

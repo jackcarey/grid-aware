@@ -1,5 +1,6 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
+import { withAttribution } from "../attribution.js";
 import {
   BMRS_CACHE_TTL_SECONDS,
   cachedJson,
@@ -41,8 +42,8 @@ import {
 import type {
   BmrsSurplus,
   ForecastPoint,
-  GridIntensityResponse,
   Horizon,
+  IntensityBody,
   RegionInfo,
   SourcePreference,
 } from "../types.js";
@@ -172,11 +173,11 @@ async function getBmrsData(cache: CacheStore, cacheKeyPrefix: string): Promise<B
 
 /** Adds the `surplus` field. */
 function withSurplus(
-  body: GridIntensityResponse,
+  body: IntensityBody,
   data: BmrsData,
   next48h: readonly ForecastPoint[] | undefined,
   durationMinutes: number,
-): GridIntensityResponse {
+): IntensityBody {
   const surplus = buildSurplus({
     bmrs: data.surplus,
     demand: data.demand,
@@ -203,7 +204,7 @@ async function resolveResponse(
   cache: CacheStore,
   allRegionsCacheKey: string,
   isOverRegionalRateLimit: () => Promise<boolean>,
-): Promise<GridIntensityResponse> {
+): Promise<IntensityBody> {
   if (target.kind === "electricitymaps") {
     if (!electricityMapsToken) {
       // So tokenless deployments fall back to CO2.js.
@@ -277,7 +278,7 @@ async function resolveResponse(
 function unknownIntensityResponse(
   target: ResolvedTarget,
   reason: string,
-): GridIntensityResponse {
+): IntensityBody {
   const location =
     target.kind === "electricitymaps"
       ? { zone: target.zone, region: { unknown: true } }
@@ -344,17 +345,19 @@ const v1Route = createRoute({
 
 /** Adds /v2/intensity, and /v1/intensity with its 1.x response shape. */
 export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
-  app.openapi(route, async (c) => (await handleIntensity(c, c.req.valid("query"))) as never);
+  app.openapi(route, async (c) => (await handleIntensity(c, c.req.valid("query"), withAttribution)) as never);
   app.openapi(
     v1Route,
-    async (c) => (await handleIntensity(c, { ...c.req.valid("query"), surplus: "false" })) as never,
+    async (c) =>
+      (await handleIntensity(c, { ...c.req.valid("query"), surplus: "false" }, (body) => body)) as never,
   );
 }
 
-/** Serves an intensity request. */
+/** Serves an intensity request, shaping the body with `present` for the API version. */
 async function handleIntensity(
   c: Context<AppEnv>,
   query: IntensityQuery,
+  present: (body: IntensityBody) => object,
 ): Promise<Response> {
   const { zone, postcode, regionid, horizon, source, surplus } = query;
   const deps = c.get("deps");
@@ -444,7 +447,7 @@ async function handleIntensity(
           const forecast48h = horizon === "48h" ? body.forecast : await next48h;
           body = withSurplus(body, await bmrsData, forecast48h, jobMinutes);
         }
-        return c.json(body, 200);
+        return c.json(present(body), 200);
       },
     );
   } catch (err) {
@@ -468,12 +471,14 @@ async function handleIntensity(
         allRegionsCacheKey,
         deps.isOverRegionalRateLimit,
       ).catch((emErr: Error) => void (reason += `; ${emErr.message}`));
-      if (body) return c.json(body, 200);
+      if (body) return c.json(present(body), 200);
     }
     const zone = target.kind === "electricitymaps" ? target.zone : "GB";
     response = c.json(
-      co2js.annualIntensity(zone, horizon, reason) ??
-        unknownIntensityResponse(target, reason),
+      present(
+        co2js.annualIntensity(zone, horizon, reason) ??
+          unknownIntensityResponse(target, reason),
+      ),
       200,
     );
   }

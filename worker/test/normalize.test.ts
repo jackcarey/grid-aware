@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { bmrsAttribution } from "../src/attribution.js";
 import {
   bestDay,
   bestWindow,
@@ -245,6 +246,12 @@ describe("normalizeBmrsSurplus", () => {
         { date: "2026-10-20", surplus: 8148 },
       ],
     });
+  });
+
+  it("credits Elexon for the year the forecast was published", () => {
+    expect(bmrsAttribution("2027-01-01T10:15:00Z").text).toBe(
+      "Contains BMRS data © Elexon Limited copyright and database right 2027",
+    );
   });
 
   it("returns undefined when there's no usable surplus data", () => {

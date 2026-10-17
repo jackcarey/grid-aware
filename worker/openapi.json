@@ -145,6 +145,13 @@
           "surplus": {
             "$ref": "#/components/schemas/Surplus"
           },
+          "attribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "description": "Credits for each source used in this response. Keep them with the data if you display or redistribute it."
+          },
           "fallback": {
             "type": "object",
             "properties": {
@@ -162,7 +169,8 @@
           "source",
           "location",
           "datetime",
-          "carbonIntensity"
+          "carbonIntensity",
+          "attribution"
         ]
       },
       "ForecastPoint": {
@@ -383,6 +391,39 @@
         },
         "description": "Present on NESO responses when `surplus=true`."
       },
+      "Attribution": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "neso",
+              "electricitymaps",
+              "co2js",
+              "bmrs"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "example": "Contains BMRS data © Elexon Limited copyright and database right 2026",
+            "description": "Credit required by the source's licence or terms."
+          },
+          "licence": {
+            "type": "string",
+            "description": "Licence or terms link."
+          },
+          "url": {
+            "type": "string",
+            "description": "Data source link."
+          }
+        },
+        "required": [
+          "source",
+          "text",
+          "licence",
+          "url"
+        ]
+      },
       "Error": {
         "type": "object",
         "properties": {
@@ -566,6 +607,36 @@
         ]
       },
       "ZoneList": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "zoneName": {
+                  "type": "string"
+                },
+                "countryName": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "attribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "description": "Credits for each source used in this response. Keep them with the data if you display or redistribute it."
+          }
+        },
+        "required": [
+          "zones",
+          "attribution"
+        ]
+      },
+      "ZoneListV1": {
         "type": "object",
         "additionalProperties": {
           "type": "object",
@@ -828,11 +899,11 @@
         "deprecated": true,
         "responses": {
           "200": {
-            "description": "Use /v2/zones.",
+            "description": "1.x response shape. Use /v2/zones.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ZoneList"
+                  "$ref": "#/components/schemas/ZoneListV1"
                 }
               }
             }

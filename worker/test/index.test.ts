@@ -935,6 +935,7 @@ describe("app: /v2/intensity surplus", () => {
 
   type Body = {
     carbonIntensity: { band: string };
+    attribution: { source: string; text: string }[];
     surplus?: {
       bmrs?: { forecast: { date: string; surplus: number }[] };
       derived?: {
@@ -957,6 +958,7 @@ describe("app: /v2/intensity surplus", () => {
     });
     const body = (await res.json()) as Body;
     expect(body.surplus).toBeUndefined();
+    expect(body.attribution.map((a) => a.source)).toEqual(["neso"]);
     expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
   });
 
@@ -968,6 +970,8 @@ describe("app: /v2/intensity surplus", () => {
         headers: { Origin: ALLOWED_ORIGIN },
       });
       const body = (await res.json()) as Body;
+      expect(body.attribution.map((a) => a.source)).toEqual(["neso", "bmrs"]);
+      expect(body.attribution[1]?.text).toMatch(/^Contains BMRS data © Elexon Limited/);
       expect(body.surplus?.bmrs?.forecast).toEqual([
         { date: "2026-01-03", surplus: 6000 },
         { date: "2026-01-04", surplus: 9000 },
@@ -1039,6 +1043,7 @@ describe("app: /v2/intensity surplus", () => {
     // The window comes from NESO, so it survives a BMRS outage; the day doesn't.
     expect(body.surplus?.derived?.suggested?.window?.averageIntensity).toBe(30);
     expect(body.surplus?.derived?.suggested?.day).toBeUndefined();
+    expect(body.attribution.map((a) => a.source)).toEqual(["neso"]);
   });
 
   it("is never present for non-GB zones", async () => {
@@ -1050,6 +1055,7 @@ describe("app: /v2/intensity surplus", () => {
     });
     const body = (await res.json()) as Body;
     expect(body.surplus).toBeUndefined();
+    expect(body.attribution.map((a) => a.source)).toEqual(["electricitymaps"]);
     expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
   });
 });
@@ -1079,7 +1085,12 @@ describe("app: /v2/zones", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
-    expect(await res.json()).toEqual({ FR: { zoneName: "France" } });
+    const body = (await res.json()) as {
+      zones: Record<string, unknown>;
+      attribution: { source: string }[];
+    };
+    expect(body.zones).toEqual({ FR: { zoneName: "France" } });
+    expect(body.attribution.map((a) => a.source)).toEqual(["electricitymaps"]);
   });
 
   it("serves the CO2.js zone list when no token is configured", async () => {
@@ -1087,8 +1098,12 @@ describe("app: /v2/zones", () => {
     const res = await app.request("/v2/zones", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.GB).toEqual({ zoneName: "Great Britain" });
+    const body = (await res.json()) as {
+      zones: Record<string, unknown>;
+      attribution: { source: string }[];
+    };
+    expect(body.zones.GB).toEqual({ zoneName: "Great Britain" });
+    expect(body.attribution.map((a) => a.source)).toEqual(["co2js"]);
   });
 });
 
@@ -1103,7 +1118,7 @@ describe("app: /v1 keeps 1.x response shapes", () => {
     ],
   };
 
-  it("ignores surplus on /v1/intensity", async () => {
+  it("leaves out attribution and ignores surplus on /v1/intensity", async () => {
     const fetchMock = vi.fn(async (_url: string | URL) => new Response(JSON.stringify(nesoNational), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const app = createApp(buildDeps());
@@ -1113,6 +1128,7 @@ describe("app: /v1 keeps 1.x response shapes", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.source).toBe("neso");
+    expect(body).not.toHaveProperty("attribution");
     expect(body).not.toHaveProperty("surplus");
     expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
   });

@@ -1,3 +1,5 @@
+import type { ElectricityMapsZones } from "./providers/electricityMaps.js";
+
 export type Band = "low" | "moderate" | "high" | "very-high" | "unknown";
 
 export interface RegionInfo {
@@ -41,6 +43,15 @@ export interface ForecastPoint {
 export interface BmrsSurplusDay {
   date: string;
   surplus: number;
+}
+
+export type SourceName = "neso" | "electricitymaps" | "co2js" | "bmrs";
+
+export interface Attribution {
+  source: SourceName;
+  text: string;
+  licence: string;
+  url: string;
 }
 
 export interface BmrsSurplus {
@@ -97,7 +108,17 @@ export interface GridIntensityResponse {
   forecast?: ForecastPoint[];
   /** GB only: Electricity Maps and CO2.js responses never carry it. */
   surplus?: Surplus;
+  /** One entry per source whose data is in this response. */
+  attribution: Attribution[];
   fallback?: Fallback;
+}
+
+/** A response before its attribution is worked out from what's in it. */
+export type IntensityBody = Omit<GridIntensityResponse, "attribution">;
+
+export interface ZoneListResponse {
+  zones: ElectricityMapsZones;
+  attribution: Attribution[];
 }
 
 export interface ZoneListEntry {

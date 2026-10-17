@@ -28,6 +28,23 @@ export const ForecastPointSchema = z
   })
   .openapi("ForecastPoint");
 
+export const AttributionSchema = z
+  .object({
+    source: z.enum(["neso", "electricitymaps", "co2js", "bmrs"]),
+    text: z.string().openapi({
+      example: "Contains BMRS data © Elexon Limited copyright and database right 2026",
+      description: "Credit required by the source's licence or terms.",
+    }),
+    licence: z.string().openapi({ description: "Licence or terms link." }),
+    url: z.string().openapi({ description: "Data source link." }),
+  })
+  .openapi("Attribution");
+
+const AttributionListSchema = z.array(AttributionSchema).openapi({
+  description:
+    "Credits for each source used in this response. Keep them with the data if you display or redistribute it.",
+});
+
 export const SurplusSchema = z
   .object({
     bmrs: z
@@ -191,6 +208,7 @@ export const GridIntensityResponseSchema = z
           "Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is \"24h\" or \"48h\", and never for CO2.js fallbacks.",
       }),
     surplus: SurplusSchema.optional(),
+    attribution: AttributionListSchema,
     fallback: z
       .object({
         reason: z.string(),
@@ -205,17 +223,26 @@ export const GridIntensityResponseSchema = z
 
 /** 1.x shape, kept for /v1. */
 export const GridIntensityResponseV1Schema = GridIntensityResponseSchema.omit({
+  attribution: true,
   surplus: true,
 }).openapi("GridIntensityResponseV1");
 
+const ZoneMapSchema = z.record(
+  z.string(),
+  z.object({
+    zoneName: z.string().optional(),
+    countryName: z.string().optional(),
+  }),
+);
+
+/** 1.x shape, kept for /v1. */
+export const ZoneListV1Schema = ZoneMapSchema.openapi("ZoneListV1");
+
 export const ZoneListSchema = z
-  .record(
-    z.string(),
-    z.object({
-      zoneName: z.string().optional(),
-      countryName: z.string().optional(),
-    }),
-  )
+  .object({
+    zones: ZoneMapSchema,
+    attribution: AttributionListSchema,
+  })
   .openapi("ZoneList");
 
 export const ErrorResponseSchema = z

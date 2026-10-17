@@ -49,12 +49,14 @@
   <summary>Full API response</summary>
   <pre id="live-response">loading&hellip;</pre>
 </details>
+<ul id="live-attribution"></ul>
 <script type="module">
   import { initGridAware } from "/grid-aware/index.js";
   const valueEl = document.getElementById("live-intensity-value");
   const mixEl = document.getElementById("live-mix");
   const mixListEl = document.getElementById("live-mix-list");
   const responseEl = document.getElementById("live-response");
+  const attributionEl = document.getElementById("live-attribution");
   const liveQueryEl = document.getElementById("live-query");
   initGridAware({
     apiBaseUrl: location.origin,
@@ -74,6 +76,19 @@
         }),
       );
       responseEl.textContent = JSON.stringify(data, null, 2);
+      // Each source's licence asks for its credit wherever the data is shown.
+      attributionEl.replaceChildren(
+        ...(data.attribution ?? []).map((entry) => {
+          const li = document.createElement("li");
+          const small = document.createElement("small");
+          const link = document.createElement("a");
+          link.href = entry.licence;
+          link.textContent = "licence";
+          small.append(entry.text + " (", link, ")");
+          li.append(small);
+          return li;
+        }),
+      );
       if (liveQueryEl) {
         liveQueryEl.textContent = "zone=" + data.location.zone;
       }
@@ -204,6 +219,12 @@
       }
     }
   }
+  attribution: {
+    source: "neso" | "electricitymaps" | "co2js" | "bmrs"
+    text: string
+    licence: string
+    url: string
+  }[]
   fallback?: {
     reason: string
   }
@@ -371,6 +392,15 @@
   percentageOfDemand?: number
 }</pre></td><td>Soonest day with `dayRank` 1.</td></tr>
 <tr><td><code>surplus.derived.suggested.day.surplus</code></td><td><pre>number</pre></td><td>MW.</td></tr>
+<tr><td><code>attribution</code></td><td><pre>{
+  source: "neso" | "electricitymaps" | "co2js" | "bmrs"
+  text: string
+  licence: string
+  url: string
+}[]</pre></td><td>Credits for each source used in this response. Keep them with the data if you display or redistribute it.</td></tr>
+<tr><td><code>attribution.text</code></td><td><pre>string</pre></td><td>Credit required by the source's licence or terms.</td></tr>
+<tr><td><code>attribution.licence</code></td><td><pre>string</pre></td><td>Licence or terms link.</td></tr>
+<tr><td><code>attribution.url</code></td><td><pre>string</pre></td><td>Data source link.</td></tr>
 <tr><td><code>fallback</code></td><td><pre>{
   reason: string
 }</pre></td><td>Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: "co2js"`), and only report `band`/`type` as "unknown" if the zone isn't in that dataset either.</td></tr></tbody>
@@ -530,11 +560,30 @@
   <p><em>No parameters.</em></p>
   <h4>Responses</h4>
   <h4><code>200</code> - Electricity Maps' supported zone list, proxied so clients never need their own token. Falls back to the zones in CO2.js's annual dataset when there's no token or Electricity Maps is unreachable.</h4>
-<pre>{ [key: string]: {
-  zoneName?: string
-  countryName?: string
-} }</pre>
-
+<pre>{
+  zones: { [key: string]: {
+    zoneName?: string
+    countryName?: string
+  } }
+  attribution: {
+    source: "neso" | "electricitymaps" | "co2js" | "bmrs"
+    text: string
+    licence: string
+    url: string
+  }[]
+}</pre>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody><tr><td><code>attribution</code></td><td><pre>{
+  source: "neso" | "electricitymaps" | "co2js" | "bmrs"
+  text: string
+  licence: string
+  url: string
+}[]</pre></td><td>Credits for each source used in this response. Keep them with the data if you display or redistribute it.</td></tr>
+<tr><td><code>attribution.text</code></td><td><pre>string</pre></td><td>Credit required by the source's licence or terms.</td></tr>
+<tr><td><code>attribution.licence</code></td><td><pre>string</pre></td><td>Licence or terms link.</td></tr>
+<tr><td><code>attribution.url</code></td><td><pre>string</pre></td><td>Data source link.</td></tr></tbody>
+</table>
 </section>
 
 <section>
@@ -544,7 +593,7 @@
   <h4>Parameters</h4>
   <p><em>No parameters.</em></p>
   <h4>Responses</h4>
-  <h4><code>200</code> - Use /v2/zones.</h4>
+  <h4><code>200</code> - 1.x response shape. Use /v2/zones.</h4>
 <pre>{ [key: string]: {
   zoneName?: string
   countryName?: string

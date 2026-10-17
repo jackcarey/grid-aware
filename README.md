@@ -39,8 +39,9 @@ the `fallback.reason` text credits them.
 
 ### API versions
 
-`/v2` is current. `/v1` returns the 1.x response shapes (no `surplus`), with `Deprecation: true`
-and a `Link` header pointing to the `/v2` equivalent.
+`/v2` is current. `/v1` returns the 1.x response shapes (no `attribution`, no `surplus`, and
+`/v1/zones` is a bare map), with `Deprecation: true` and a `Link` header pointing to the `/v2`
+equivalent.
 
 ### Surplus (GB only)
 
@@ -58,6 +59,18 @@ minutes instead of `true` (e.g. `surplus=90`, max 2880) to size `suggested.windo
 
 `derived` figures are calculated by grid-aware, not published by NESO or Elexon. BMRS data is
 cached for an hour. If BMRS is down, the BMRS-based fields are left out.
+
+### Attribution
+
+Responses include an `attribution` array with the credit text and licence link for each source
+used. Keep these with the data if you display or redistribute it.
+
+| `source` | Data | Terms |
+| --- | --- | --- |
+| `neso` | [NESO Carbon Intensity API](https://carbonintensity.org.uk) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [terms of use](https://github.com/carbon-intensity/terms/) |
+| `electricitymaps` | [Electricity Maps](https://electricitymaps.com) | [Terms of service](https://electricitymaps.com/terms-of-service) |
+| `co2js` | Electricity Maps annual averages via [CO2.js](https://www.thegreenwebfoundation.org/co2-js/) | [ODbL](https://opendatacommons.org/licenses/odbl/) |
+| `bmrs` | [Elexon BMRS](https://bmrs.elexon.co.uk) | [BMRS data licence](https://www.elexon.co.uk/bsc/data/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/) |
 
 ### Deploying
 
@@ -100,3 +113,5 @@ release automatically, which triggers the JSR publish.
 ## License
 
 [MIT](LICENSE)
+
+Data sources have their own terms; see [Attribution](#attribution).

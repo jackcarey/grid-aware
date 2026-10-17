@@ -8,7 +8,7 @@ import type {
   DerivedSurplusDay,
   ForecastPoint,
   GenerationMixEntry,
-  GridIntensityResponse,
+  IntensityBody,
   RequestedLocation,
   SuggestedDay,
   SuggestedWindow,
@@ -146,7 +146,7 @@ export function normalizeElectricityMapsLatest(
   raw: ElectricityMapsLatest,
   location: RequestedLocation,
   fallbackReason?: string,
-): GridIntensityResponse {
+): IntensityBody {
   return {
     source: "electricitymaps",
     location,
@@ -166,7 +166,7 @@ export function normalizeElectricityMapsForecast(
   raw: ElectricityMapsForecast,
   location: RequestedLocation,
   fallbackReason?: string,
-): GridIntensityResponse {
+): IntensityBody {
   const first = raw.forecast[0];
   if (!first) {
     throw new UpstreamError("Electricity Maps forecast returned no entries", "electricitymaps");
@@ -207,7 +207,7 @@ function nesoForecastPoint(period: NesoIntensityPeriod): ForecastPoint {
 export function normalizeNesoNational(
   periods: readonly NesoIntensityPeriod[],
   location: RequestedLocation,
-): GridIntensityResponse {
+): IntensityBody {
   const first = periods[0];
   if (!first) {
     throw new UpstreamError("NESO returned no national intensity data", "neso");
@@ -216,7 +216,7 @@ export function normalizeNesoNational(
   if (value === undefined) {
     throw new UpstreamError("NESO period had neither actual nor forecast intensity", "neso");
   }
-  const response: GridIntensityResponse = {
+  const response: IntensityBody = {
     source: "neso",
     location,
     datetime: first.from,
@@ -253,12 +253,12 @@ function nesoRegionalForecastPoint(period: NesoRegionalPeriod): ForecastPoint {
 export function normalizeNesoRegional(
   region: NesoRegion,
   location: RequestedLocation,
-): GridIntensityResponse {
+): IntensityBody {
   const first = region.data[0];
   if (!first) {
     throw new UpstreamError("NESO returned no regional intensity data", "neso");
   }
-  const response: GridIntensityResponse = {
+  const response: IntensityBody = {
     source: "neso",
     location: {
       ...location,

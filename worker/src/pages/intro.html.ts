@@ -22,12 +22,14 @@ export const introHtml = `<h1>grid-aware</h1>
   <summary>Full API response</summary>
   <pre id="live-response">loading&hellip;</pre>
 </details>
+<ul id="live-attribution"></ul>
 <script type="module">
   import { initGridAware } from "/grid-aware/index.js";
   const valueEl = document.getElementById("live-intensity-value");
   const mixEl = document.getElementById("live-mix");
   const mixListEl = document.getElementById("live-mix-list");
   const responseEl = document.getElementById("live-response");
+  const attributionEl = document.getElementById("live-attribution");
   const liveQueryEl = document.getElementById("live-query");
   initGridAware({
     apiBaseUrl: location.origin,
@@ -47,6 +49,19 @@ export const introHtml = `<h1>grid-aware</h1>
         }),
       );
       responseEl.textContent = JSON.stringify(data, null, 2);
+      // Each source's licence asks for its credit wherever the data is shown.
+      attributionEl.replaceChildren(
+        ...(data.attribution ?? []).map((entry) => {
+          const li = document.createElement("li");
+          const small = document.createElement("small");
+          const link = document.createElement("a");
+          link.href = entry.licence;
+          link.textContent = "licence";
+          small.append(entry.text + " (", link, ")");
+          li.append(small);
+          return li;
+        }),
+      );
       if (liveQueryEl) {
         liveQueryEl.textContent = "zone=" + data.location.zone;
       }
