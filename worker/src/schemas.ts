@@ -115,7 +115,7 @@ export const ErrorResponseSchema = z
   .object({
     error: z.object({
       message: z.string(),
-      provider: z.enum(["electricitymaps", "neso"]).optional(),
+      provider: z.enum(["electricitymaps", "neso", "bmrs"]).optional(),
     }),
   })
   .openapi("Error");

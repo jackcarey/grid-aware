@@ -1,4 +1,4 @@
-export type ProviderName = "electricitymaps" | "neso";
+export type ProviderName = "electricitymaps" | "neso" | "bmrs";
 
 export class ApiError extends Error {
   constructor(

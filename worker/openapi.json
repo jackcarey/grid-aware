@@ -239,7 +239,8 @@
                 "type": "string",
                 "enum": [
                   "electricitymaps",
-                  "neso"
+                  "neso",
+                  "bmrs"
                 ]
               }
             },

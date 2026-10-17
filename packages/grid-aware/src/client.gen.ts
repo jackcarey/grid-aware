@@ -191,7 +191,7 @@ export interface components {
             error: {
                 message: string;
                 /** @enum {string} */
-                provider?: "electricitymaps" | "neso";
+                provider?: "electricitymaps" | "neso" | "bmrs";
             };
         };
         ZoneList: {
