@@ -54,6 +54,20 @@ describe("createGridAwareClient", () => {
     expect(fetchStub.requestedUrl().searchParams.get("zone")).toBe("GB");
   });
 
+  it("only asks for surplus when the option is set", async () => {
+    const fetchStub = stubFetch(CURRENT);
+    const client = createGridAwareClient("https://example.com");
+
+    await client.getCurrentIntensity({ zone: "GB" });
+    expect(fetchStub.requestedUrl().searchParams.has("surplus")).toBe(false);
+
+    await client.getForecast({ zone: "GB", surplus: true });
+    expect(fetchStub.requestedUrl().searchParams.get("surplus")).toBe("true");
+
+    await client.getForecast({ zone: "GB", surplus: 90 });
+    expect(fetchStub.requestedUrl().searchParams.get("surplus")).toBe("90");
+  });
+
   it("getForecast defaults to horizon=24h and returns the forecast array", async () => {
     const fetchStub = stubFetch(WITH_FORECAST);
     const client = createGridAwareClient("https://example.com");

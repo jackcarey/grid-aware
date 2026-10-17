@@ -25,6 +25,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const isBmrsUrl = (url: unknown) => String(url).startsWith("https://data.elexon.co.uk/");
+
 describe("app: public routes", () => {
   it("serves the OpenAPI spec with no Origin required", async () => {
     const app = createApp(buildDeps());
@@ -367,32 +369,27 @@ describe("app: /v1/intensity", () => {
   });
 
   it("shares one NESO all-regions fetch once regional traffic is rate-limited", async () => {
+    // NESO's all-regions endpoint groups by period, not by region.
     const fetchMock = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
             data: [
               {
-                regionid: 3,
-                dnoregion: "North West England",
-                shortname: "North West England",
-                data: [
+                from: "2026-01-01T00:00Z",
+                to: "2026-01-01T00:30Z",
+                regions: [
                   {
-                    from: "2026-01-01T00:00Z",
-                    to: "2026-01-01T00:30Z",
+                    regionid: 3,
+                    dnoregion: "North West England",
+                    shortname: "North West England",
                     intensity: { forecast: 100, index: "moderate" },
                     generationmix: [],
                   },
-                ],
-              },
-              {
-                regionid: 8,
-                dnoregion: "West Midlands",
-                shortname: "West Midlands",
-                data: [
                   {
-                    from: "2026-01-01T00:00Z",
-                    to: "2026-01-01T00:30Z",
+                    regionid: 8,
+                    dnoregion: "West Midlands",
+                    shortname: "West Midlands",
                     intensity: { forecast: 150, index: "moderate" },
                     generationmix: [],
                   },
@@ -881,10 +878,200 @@ describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
   });
 });
 
-describe("app: /v1/zones allowlist", () => {
+describe("app: /v2/intensity surplus", () => {
+  const nesoRegional = {
+    data: [
+      {
+        regionid: 13,
+        dnoregion: "London",
+        shortname: "London",
+        data: [
+          ["2026-01-01T00:00Z", "2026-01-01T00:30Z", 90],
+          ["2026-01-01T00:30Z", "2026-01-01T01:00Z", 40],
+          ["2026-01-01T01:00Z", "2026-01-01T01:30Z", 60],
+          ["2026-01-01T01:30Z", "2026-01-01T02:00Z", 30],
+        ].map(([from, to, forecast]) => ({
+          from,
+          to,
+          intensity: { forecast, index: "moderate" },
+          generationmix: [
+            { fuel: "wind", perc: 50 },
+            { fuel: "gas", perc: 50 },
+          ],
+        })),
+      },
+    ],
+  };
+  const surplus = {
+    data: [
+      { forecastDate: "2026-01-03", publishTime: "2026-01-01T10:15:00Z", surplus: 6000 },
+      { forecastDate: "2026-01-04", publishTime: "2026-01-01T10:15:00Z", surplus: 9000 },
+    ],
+  };
+  const demand = {
+    data: [
+      { forecastDate: "2026-01-03", nationalDemand: 30000 },
+    ],
+  };
+
+  function routedFetch(bmrsStatus = 200) {
+    return vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/forecast/surplus/")) {
+        return new Response(JSON.stringify(surplus), { status: bmrsStatus });
+      }
+      if (url.includes("/forecast/demand/")) {
+        return new Response(JSON.stringify(demand), { status: bmrsStatus });
+      }
+      if (url.includes("api.neso.energy")) {
+        return new Response(
+          JSON.stringify({
+            result: { records: [{ date: "2026-01-03", mw: "12000", capacity: "24000", periods: "48" }] },
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("electricitymap")) {
+        return new Response(
+          JSON.stringify({ zone: "FR", carbonIntensity: 10, datetime: "2026-01-01T00:00:00.000Z" }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify(nesoRegional), { status: 200 });
+    });
+  }
+
+  type Body = {
+    carbonIntensity: { band: string };
+    attribution: { source: string; text: string }[];
+    surplus?: {
+      bmrs?: { forecast: { date: string; surplus: number }[] };
+      derived?: {
+        forecast?: { date: string; percentageOfDemand?: number; dayRank: number }[];
+        regional?: { renewablePercentage: number };
+        suggested?: {
+          window?: { from: string; to: string; averageIntensity: number };
+          day?: { date: string; surplus: number; percentageOfDemand?: number };
+        };
+      };
+    };
+  };
+
+  it("is left out, with no BMRS call, unless asked for", async () => {
+    const fetchMock = routedFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const app = createApp(buildDeps());
+    const res = await app.request("/v2/intensity?regionid=13", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    const body = (await res.json()) as Body;
+    expect(body.surplus).toBeUndefined();
+    expect(body.attribution.map((a) => a.source)).toEqual(["neso"]);
+    expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
+  });
+
+  it("includes the national surplus and regional proxy for a regional request on every horizon", async () => {
+    vi.stubGlobal("fetch", routedFetch());
+    const app = createApp(buildDeps());
+    for (const horizon of ["latest", "48h"]) {
+      const res = await app.request(`/v2/intensity?regionid=13&horizon=${horizon}&surplus=true`, {
+        headers: { Origin: ALLOWED_ORIGIN },
+      });
+      const body = (await res.json()) as Body;
+      expect(body.attribution.map((a) => a.source)).toEqual(["neso", "bmrs", "neso-data-portal"]);
+      expect(body.attribution[1]?.text).toMatch(/^Contains BMRS data © Elexon Limited/);
+      expect(body.surplus?.bmrs?.forecast).toEqual([
+        { date: "2026-01-03", surplus: 6000 },
+        { date: "2026-01-04", surplus: 9000 },
+      ]);
+      expect(body.surplus?.derived).toEqual({
+        forecast: [
+          { date: "2026-01-03", percentageOfDemand: 20, windPercentageOfCapacity: 50, dayRank: 1 },
+          { date: "2026-01-04", dayRank: 2 },
+        ],
+        regional: { renewablePercentage: 50 },
+        suggested: {
+          window: { from: "2026-01-01T01:30Z", to: "2026-01-01T02:00Z", averageIntensity: 30, unit: "gCO2eq/kWh" },
+          day: { date: "2026-01-03", surplus: 6000, percentageOfDemand: 20, windPercentageOfCapacity: 50 },
+        },
+      });
+    }
+  });
+
+  it("rejects a surplus value that isn't true, false or a job length up to 48 hours", async () => {
+    vi.stubGlobal("fetch", routedFetch());
+    const app = createApp(buildDeps());
+    for (const value of ["yes", "0", "2881", "1.5"]) {
+      const res = await app.request(`/v2/intensity?regionid=13&surplus=${value}`, {
+        headers: { Origin: ALLOWED_ORIGIN },
+      });
+      expect(res.status, value).toBe(400);
+    }
+  });
+
+  it("sizes the suggested window to the job length given as surplus", async () => {
+    vi.stubGlobal("fetch", routedFetch());
+    const app = createApp(buildDeps());
+    const res = await app.request("/v2/intensity?regionid=13&surplus=90", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    const body = (await res.json()) as Body;
+    // 90 minutes is three periods: 40 + 60 + 30 beats 90 + 40 + 60.
+    expect(body.surplus?.derived?.suggested?.window).toEqual({
+      from: "2026-01-01T00:30Z",
+      to: "2026-01-01T02:00Z",
+      averageIntensity: 43,
+      unit: "gCO2eq/kWh",
+    });
+  });
+
+  it("shares one cached BMRS fetch across GB requests", async () => {
+    const fetchMock = routedFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const app = createApp(buildDeps());
+    await app.request("/v2/intensity?regionid=13&surplus=true", { headers: { Origin: ALLOWED_ORIGIN } });
+    await app.request("/v2/intensity?regionid=13&horizon=24h&surplus=true", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    const surplusCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/forecast/surplus/"));
+    expect(surplusCalls).toHaveLength(1);
+  });
+
+  it("still serves intensity, without the national surplus, when BMRS fails", async () => {
+    vi.stubGlobal("fetch", routedFetch(503));
+    const app = createApp(buildDeps());
+    const res = await app.request("/v2/intensity?regionid=13&surplus=true", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Body;
+    expect(body.carbonIntensity.band).toBe("moderate");
+    expect(body.surplus?.bmrs).toBeUndefined();
+    expect(body.surplus?.derived?.regional).toEqual({ renewablePercentage: 50 });
+    // The window comes from NESO, so it survives a BMRS outage; the day doesn't.
+    expect(body.surplus?.derived?.suggested?.window?.averageIntensity).toBe(30);
+    expect(body.surplus?.derived?.suggested?.day).toBeUndefined();
+    expect(body.attribution.map((a) => a.source)).toEqual(["neso"]);
+  });
+
+  it("is never present for non-GB zones", async () => {
+    const fetchMock = routedFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const app = createApp(buildDeps());
+    const res = await app.request("/v2/intensity?zone=FR&surplus=true", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    const body = (await res.json()) as Body;
+    expect(body.surplus).toBeUndefined();
+    expect(body.attribution.map((a) => a.source)).toEqual(["electricitymaps"]);
+    expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
+  });
+});
+
+describe("app: /v2/zones", () => {
   it("rejects a disallowed origin", async () => {
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/zones", {
+    const res = await app.request("/v2/zones", {
       headers: { Origin: "https://evil.example" },
     });
     expect(res.status).toBe(403);
@@ -901,19 +1088,81 @@ describe("app: /v1/zones allowlist", () => {
       ),
     );
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/zones", {
+    const res = await app.request("/v2/zones", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+    const body = (await res.json()) as {
+      zones: Record<string, unknown>;
+      attribution: { source: string }[];
+    };
+    expect(body.zones).toEqual({ FR: { zoneName: "France" } });
+    expect(body.attribution.map((a) => a.source)).toEqual(["electricitymaps"]);
   });
 
   it("serves the CO2.js zone list when no token is configured", async () => {
     const app = createApp(buildDeps({ electricityMapsToken: undefined }));
-    const res = await app.request("/v1/zones", {
+    const res = await app.request("/v2/zones", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
+    const body = (await res.json()) as {
+      zones: Record<string, unknown>;
+      attribution: { source: string }[];
+    };
+    expect(body.zones.GB).toEqual({ zoneName: "Great Britain" });
+    expect(body.attribution.map((a) => a.source)).toEqual(["co2js"]);
+  });
+});
+
+describe("app: /v1 keeps 1.x response shapes", () => {
+  const nesoNational = {
+    data: [
+      {
+        from: "2026-01-01T00:00Z",
+        to: "2026-01-01T00:30Z",
+        intensity: { actual: 100, forecast: 100, index: "moderate" },
+      },
+    ],
+  };
+
+  it("leaves out attribution and ignores surplus on /v1/intensity", async () => {
+    const fetchMock = vi.fn(async (_url: string | URL) => new Response(JSON.stringify(nesoNational), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/intensity?zone=GB&surplus=true", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.source).toBe("neso");
+    expect(body).not.toHaveProperty("attribution");
+    expect(body).not.toHaveProperty("surplus");
+    expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
+  });
+
+  it("returns the bare zone map on /v1/zones", async () => {
+    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
+    const res = await app.request("/v1/zones", { headers: { Origin: ALLOWED_ORIGIN } });
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.GB).toEqual({ zoneName: "Great Britain" });
+    expect(body).not.toHaveProperty("zones");
+  });
+
+  it("points /v1 callers at the same request on /v2", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(nesoNational), { status: 200 })));
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/intensity?zone=GB&horizon=latest", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.headers.get("Deprecation")).toBe("true");
+    expect(res.headers.get("Link")).toBe('</v2/intensity?zone=GB&horizon=latest>; rel="successor-version"');
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+  });
+
+  it("doesn't mark /v2 as deprecated", async () => {
+    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
+    const res = await app.request("/v2/zones", { headers: { Origin: ALLOWED_ORIGIN } });
+    expect(res.headers.get("Deprecation")).toBeNull();
   });
 });

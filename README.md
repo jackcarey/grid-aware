@@ -30,12 +30,65 @@ cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN and ALLOWED_OR
 npx wrangler dev
 ```
 
-`/v1/*` requests need a matching `Origin`/`Referer` header.
+`/v2/*` and `/v1/*` requests need a matching `Origin`/`Referer` header.
 
 `ELECTRICITY_MAPS_TOKEN` is optional. Without it, non-GB zones (and GB when NESO fails) are served
 from CO2.js's bundled annual averages, with `source: "co2js"` and a `fallback.reason`, and
-`/v1/zones` lists CO2.js's zones instead. Those figures are Electricity Maps data under ODbL, so
+`/v2/zones` lists CO2.js's zones instead. Those figures are Electricity Maps data under ODbL, so
 the `fallback.reason` text credits them.
+
+### API versions
+
+`/v2` is current. `/v1` returns the 1.x response shapes (no `attribution`, no `surplus`, and
+`/v1/zones` is a bare map), with `Deprecation: true` and a `Link` header pointing to the `/v2`
+equivalent.
+
+### Surplus (GB only)
+
+`/v2/intensity?surplus=true` adds a `surplus` object to NESO responses. Pass a job length in
+minutes instead of `true` (e.g. `surplus=90`, max 2880) to size `suggested.window`; `true` means 30.
+
+| Field | |
+| --- | --- |
+| `bmrs.forecast[]` | NESO's National Surplus Forecast ([BMRS](https://bmrs.elexon.co.uk/surplus-forecast-and-margin) OCNMFD): MW at each day's peak half hour, 2-14 days ahead. GB-wide. |
+| `derived.forecast[].percentageOfDemand` | Surplus as a % of forecast national demand (BMRS NDFD). |
+| `derived.forecast[].windPercentageOfCapacity` | Average forecast wind output as a % of wind capacity ([NESO 14-day wind forecast](https://www.neso.energy/data-portal/14-days-ahead-wind-forecasts)). Transmission-connected wind only. |
+| `derived.forecast[].dayRank` | Rank for running deferrable compute, 1 being best. See [Day ranking](#day-ranking). |
+| `derived.regional.renewablePercentage` | Wind + solar + hydro share of the region's current mix. Regional requests only. |
+| `derived.suggested.window` | Best time in the next 48 hours. See [Suggested times](#suggested-times). |
+| `derived.suggested.day` | Best day 2-14 days ahead. See [Suggested times](#suggested-times). |
+
+`derived` figures are calculated by grid-aware, not published by NESO or Elexon. BMRS and wind
+data are cached for an hour. If either source is down, the fields based on it are left out.
+
+#### Suggested times
+
+| Field | For jobs that can wait | Picks |
+| --- | --- | --- |
+| `window` | Up to 48 hours | Lowest average carbon intensity period that fits the job, from NESO's half-hourly forecast for the region (or GB). Earliest wins in there is a tie and `from` may be the current half-hour. |
+| `day` | 2-14 days | The day with `dayRank` 1. |
+
+#### Day ranking
+
+Days are scored by:
+
+1. Spare capacity (`surplus` above 0) first, so extra load doesn't land on a grid short of capacity.
+2. Wind share, as a stand-in for lower carbon, since there's no intensity forecast this far ahead. Days within 5% of each other count as equal, as the forecast isn't that precise.
+3. Higher `percentageOfDemand` (surplus as a % of forecast demand), since the same spare MW is more headroom on a quieter day. Raw MW is used if there's no demand forecast.
+4. The earlier date, so no two days share a rank and compute happens sooner.
+
+### Attribution
+
+Responses include an `attribution` array with the credit text and licence link for each source
+used. Keep these with the data if you display or redistribute it.
+
+| `source` | Data | Terms |
+| --- | --- | --- |
+| `neso` | [NESO Carbon Intensity API](https://carbonintensity.org.uk) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [terms of use](https://github.com/carbon-intensity/terms/) |
+| `electricitymaps` | [Electricity Maps](https://electricitymaps.com) | [Terms of service](https://electricitymaps.com/terms-of-service) |
+| `co2js` | Electricity Maps annual averages via [CO2.js](https://www.thegreenwebfoundation.org/co2-js/) | [ODbL](https://opendatacommons.org/licenses/odbl/) |
+| `neso-data-portal` | [NESO 14-day wind forecast](https://www.neso.energy/data-portal/14-days-ahead-wind-forecasts) | [NESO Open Data Licence](https://www.neso.energy/data-portal/neso-open-licence) |
+| `bmrs` | [Elexon BMRS](https://bmrs.elexon.co.uk) | [BMRS data licence](https://www.elexon.co.uk/bsc/data/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/) |
 
 ### Deploying
 
@@ -78,3 +131,5 @@ release automatically, which triggers the JSR publish.
 ## License
 
 [MIT](LICENSE)
+
+Data sources have their own terms; see [Attribution](#attribution).

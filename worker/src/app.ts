@@ -7,6 +7,7 @@ import type { AppDeps, AppEnv } from "./ports.js";
 import { registerIntensityRoute } from "./routes/intensity.js";
 import { registerZonesRoute } from "./routes/zones.js";
 
+/** Builds the API app with its routes and middleware, wired to the given dependencies. */
 export function createApp(deps: AppDeps): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
@@ -32,8 +33,18 @@ export function createApp(deps: AppDeps): OpenAPIHono<AppEnv> {
     },
   });
 
-  app.use("/v1/*", createAllowlistMiddleware(deps.allowedOrigins));
-  app.use("/v1/*", createRateLimitMiddleware());
+  // /v1 keeps its 1.x response shapes; point callers at the same request on /v2.
+  app.use("/v1/*", async (c, next) => {
+    await next();
+    const { pathname, search } = new URL(c.req.url);
+    c.res = new Response(c.res.body, c.res);
+    c.res.headers.set("Deprecation", "true");
+    c.res.headers.set("Link", `<${pathname.replace(/^\/v1\//, "/v2/")}${search}>; rel="successor-version"`);
+  });
+  for (const path of ["/v1/*", "/v2/*"]) {
+    app.use(path, createAllowlistMiddleware(deps.allowedOrigins));
+    app.use(path, createRateLimitMiddleware());
+  }
   registerIntensityRoute(app);
   registerZonesRoute(app);
 

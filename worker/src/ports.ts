@@ -17,7 +17,7 @@ export interface AppDeps {
   getColo(request: Request): string | undefined;
   /** True once GB regional traffic is high enough that one shared all-regions fetch beats one-off per-region calls. */
   isOverRegionalRateLimit(): Promise<boolean>;
-  /** True once total /v1/* traffic (any caller, any origin) exceeds the deployment's hard cap - blocks the request outright to protect the upstream quota. */
+  /** True once total /v1/* and /v2/* traffic (any caller, any origin) exceeds the deployment's hard cap - blocks the request outright to protect the upstream quota. */
   isOverApiRateLimit(): Promise<boolean>;
   cache: CacheStore;
 }
@@ -25,6 +25,7 @@ export interface AppDeps {
 /** Hono generic env: how route handlers access AppDeps via `c.get("deps")`. */
 export type AppEnv = { Variables: { deps: AppDeps } };
 
+/** Cache store held in memory, for tests and non-Cloudflare hosts. */
 export function createInMemoryCacheStore(): CacheStore {
   const store = new Map<string, { response: Response; expiresAt: number }>();
   return {
@@ -43,6 +44,7 @@ export function createInMemoryCacheStore(): CacheStore {
   };
 }
 
+/** Dependencies that detect nothing and never rate limit, with any overrides applied. Handy for tests. */
 export function createNoopAppDeps(overrides: Partial<AppDeps> = {}): AppDeps {
   return {
     electricityMapsToken: undefined,

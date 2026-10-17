@@ -176,6 +176,7 @@ export function cityForColo(colo: string | undefined): string | undefined {
   return COLO_TO_CITY[colo.trim().toUpperCase()];
 }
 
+/** Region info when only the nation is known. */
 export function regionInfoFromNation(nation: RegionInfo["nation"]): RegionInfo {
   return nation ? { nation, unknown: false } : { unknown: true };
 }

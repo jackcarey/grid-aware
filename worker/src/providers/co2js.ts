@@ -1,7 +1,7 @@
 // @ts-expect-error no published types
 import datasets from "@tgwf/co2/data/electricity-maps";
 import { bandFromValue } from "../bands.js";
-import type { GridIntensityResponse, Horizon } from "../types.js";
+import type { Horizon, IntensityBody } from "../types.js";
 import type { ElectricityMapsZones } from "./electricityMaps.js";
 
 interface YearlyZone {
@@ -14,11 +14,12 @@ const YEAR = Math.max(
 );
 const data = datasets[`yearly${YEAR}`].data as Record<string, YearlyZone>;
 
+/** Builds a response from Electricity Maps' latest annual average for a zone, or undefined if CO2.js doesn't have that zone. */
 export function annualIntensity(
   zone: string,
   horizon: Horizon,
   reason: string,
-): GridIntensityResponse | undefined {
+): IntensityBody | undefined {
   const entry = data[zone];
   if (!entry) return undefined;
   const value = entry.carbonIntensity.value;
@@ -36,6 +37,7 @@ export function annualIntensity(
   };
 }
 
+/** Lists the zones in CO2.js's annual dataset. */
 export function listZones(): ElectricityMapsZones {
   return Object.fromEntries(
     Object.entries(data).map(([key, { zone }]) => [

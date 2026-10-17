@@ -38,6 +38,7 @@ interface OpenApiDocument {
   components?: { schemas?: Record<string, OpenApiSchema> };
 }
 
+/** Follows a schema's $ref to the schema it points at. */
 function resolveSchema(schema: OpenApiSchema, doc: OpenApiDocument): OpenApiSchema {
   if (!schema.$ref) return schema;
   const name = schema.$ref.replace("#/components/schemas/", "");
@@ -108,6 +109,7 @@ function collectFieldDocs(schema: OpenApiSchema, doc: OpenApiDocument, prefix = 
   return [];
 }
 
+/** Renders a schema's fields and descriptions as HTML. */
 function renderFieldDocs(schema: OpenApiSchema, doc: OpenApiDocument): string {
   const rows = collectFieldDocs(schema, doc).filter((row) => row.description);
   if (rows.length === 0) return "";
@@ -123,6 +125,7 @@ function renderFieldDocs(schema: OpenApiSchema, doc: OpenApiDocument): string {
 </table>`;
 }
 
+/** Escapes text for safe use in HTML. */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -130,6 +133,7 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+/** Renders a route's query parameters as HTML. */
 function renderParameters(parameters: OpenApiParameter[] | undefined): string {
   if (!parameters || parameters.length === 0) return "<p><em>No parameters.</em></p>";
   const rows = parameters
@@ -147,6 +151,7 @@ function renderParameters(parameters: OpenApiParameter[] | undefined): string {
 </table>`;
 }
 
+/** Renders a route's responses as HTML. */
 function renderResponses(
   responses: Record<string, OpenApiResponse> | undefined,
   doc: OpenApiDocument,
@@ -166,6 +171,7 @@ ${renderFieldDocs(schema, doc)}`;
   return sections;
 }
 
+/** Renders the API reference section from the OpenAPI document. */
 function renderApiReference(doc: OpenApiDocument): string {
   const sections = Object.entries(doc.paths)
     .flatMap(([path, methods]) =>
@@ -192,6 +198,7 @@ const FAVICON_HREF = `data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚡</text></svg>',
 )}`;
 
+/** Renders the full docs page. */
 function renderPage(doc: OpenApiDocument): string {
   return `<!doctype html>
 <html lang="en">

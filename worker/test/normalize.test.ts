@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { bmrsAttribution } from "../src/attribution.js";
 import {
+  bestDay,
+  bestWindow,
+  deriveSurplusDays,
+  normalizeBmrsSurplus,
   normalizeElectricityMapsForecast,
   normalizeElectricityMapsLatest,
   normalizeNesoNational,
   normalizeNesoRegional,
+  renewablePercentage,
 } from "../src/normalize.js";
 
 describe("normalizeElectricityMapsLatest", () => {
@@ -223,5 +229,193 @@ describe("normalizeNesoRegional", () => {
         { zone: "GB", region: { unknown: true } },
       ),
     ).toThrow();
+  });
+});
+
+describe("normalizeBmrsSurplus", () => {
+  it("maps each day's surplus", () => {
+    const result = normalizeBmrsSurplus([
+      { forecastDate: "2026-10-19", publishTime: "2026-10-17T10:15:00Z", surplus: 6398 },
+      { forecastDate: "2026-10-20", publishTime: "2026-10-17T10:15:00Z", surplus: 8148 },
+    ]);
+    expect(result).toEqual({
+      unit: "MW",
+      publishTime: "2026-10-17T10:15:00Z",
+      forecast: [
+        { date: "2026-10-19", surplus: 6398 },
+        { date: "2026-10-20", surplus: 8148 },
+      ],
+    });
+  });
+
+  it("credits Elexon for the year the forecast was published", () => {
+    expect(bmrsAttribution("2027-01-01T10:15:00Z").text).toBe(
+      "Contains BMRS data © Elexon Limited copyright and database right 2027",
+    );
+  });
+
+  it("returns undefined when there's no usable surplus data", () => {
+    expect(normalizeBmrsSurplus([])).toBeUndefined();
+  });
+});
+
+describe("deriveSurplusDays", () => {
+  const bmrs = {
+    unit: "MW" as const,
+    publishTime: "2026-10-17T10:15:00Z",
+    forecast: [
+      { date: "2026-10-19", surplus: 6000 },
+      { date: "2026-10-20", surplus: 9000 },
+      { date: "2026-10-21", surplus: 12000 },
+    ],
+  };
+  const demand = (forecastDate: string, nationalDemand: number) => ({ forecastDate, nationalDemand });
+
+  it("gives each day's share of national demand and ranks days by it", () => {
+    expect(
+      deriveSurplusDays(bmrs, [demand("2026-10-19", 30000), demand("2026-10-20", 36000)]),
+    ).toEqual([
+      { date: "2026-10-19", percentageOfDemand: 20, dayRank: 2 },
+      { date: "2026-10-20", percentageOfDemand: 25, dayRank: 1 },
+      { date: "2026-10-21", dayRank: 3 },
+    ]);
+  });
+
+  it("ranks by raw MW when there's no demand forecast, then by the soonest date", () => {
+    const flat = { ...bmrs, forecast: [{ date: "2026-10-20", surplus: 5 }, { date: "2026-10-19", surplus: 5 }] };
+    expect(deriveSurplusDays(flat, []).map((d) => d.dayRank)).toEqual([2, 1]);
+    expect(deriveSurplusDays(bmrs, []).map((d) => d.dayRank)).toEqual([3, 2, 1]);
+  });
+
+  it("treats wind within 5 points of the windiest remaining day as level", () => {
+    const days = {
+      ...bmrs,
+      forecast: [
+        { date: "2026-10-23", surplus: 15000 },
+        { date: "2026-10-24", surplus: 15180 },
+        { date: "2026-10-25", surplus: 14430 },
+        { date: "2026-10-26", surplus: 10920 },
+        { date: "2026-10-27", surplus: 16000 },
+      ],
+    };
+    const wind = [
+      { date: "2026-10-23", windPercentageOfCapacity: 64.6 },
+      { date: "2026-10-24", windPercentageOfCapacity: 62.6 },
+      { date: "2026-10-25", windPercentageOfCapacity: 65 },
+      { date: "2026-10-26", windPercentageOfCapacity: 62.7 },
+      // Most slack, but well below the windiest group.
+      { date: "2026-10-27", windPercentageOfCapacity: 55.7 },
+    ];
+    const demands = ["2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27"].map((d) =>
+      demand(d, 30000),
+    );
+    expect(deriveSurplusDays(days, demands, wind).map((d) => [d.date, d.dayRank])).toEqual([
+      ["2026-10-23", 2],
+      ["2026-10-24", 1],
+      ["2026-10-25", 3],
+      ["2026-10-26", 4],
+      ["2026-10-27", 5],
+    ]);
+  });
+
+  it("ranks the windiest day with a positive surplus first, then share of demand", () => {
+    const days = {
+      ...bmrs,
+      forecast: [
+        { date: "2026-10-19", surplus: 9000 },
+        { date: "2026-10-20", surplus: 3000 },
+        { date: "2026-10-21", surplus: -500 },
+        { date: "2026-10-22", surplus: 6000 },
+      ],
+    };
+    const wind = [
+      { date: "2026-10-19", windPercentageOfCapacity: 30 },
+      { date: "2026-10-20", windPercentageOfCapacity: 60 },
+      // Windiest, but there's no spare capacity, so it ranks last.
+      { date: "2026-10-21", windPercentageOfCapacity: 80 },
+      { date: "2026-10-22", windPercentageOfCapacity: 60 },
+    ];
+    const demands = ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"].map((d) => demand(d, 30000));
+    expect(deriveSurplusDays(days, demands, wind).map((d) => [d.date, d.dayRank])).toEqual([
+      ["2026-10-19", 3],
+      ["2026-10-20", 2],
+      ["2026-10-21", 4],
+      ["2026-10-22", 1],
+    ]);
+    expect(deriveSurplusDays(days, demands, wind)[1]).toEqual({
+      date: "2026-10-20",
+      percentageOfDemand: 10,
+      windPercentageOfCapacity: 60,
+      dayRank: 2,
+    });
+  });
+});
+
+describe("renewablePercentage", () => {
+  it("sums wind, solar and hydro only", () => {
+    expect(
+      renewablePercentage([
+        { fuel: "wind", percentage: 40.2 },
+        { fuel: "solar", percentage: 10.1 },
+        { fuel: "hydro", percentage: 2 },
+        { fuel: "gas", percentage: 30 },
+        { fuel: "nuclear", percentage: 17.7 },
+      ]),
+    ).toBe(52.3);
+  });
+});
+
+describe("bestWindow", () => {
+  const point = (hh: string, value: number | null) => ({
+    datetime: `2026-01-01T${hh}:00Z`,
+    validTo: `2026-01-01T${hh}:30Z`,
+    value,
+    type: "forecast" as const,
+    band: "low" as const,
+  });
+
+  it("picks the earliest of equally clean windows", () => {
+    expect(bestWindow([point("00", 50), point("01", 20), point("02", 20)], 30)?.from).toBe("2026-01-01T01:00Z");
+  });
+
+  it("rounds the duration up to whole half-hours and skips runs with gaps", () => {
+    const window = bestWindow([point("00", 10), point("01", null), point("02", 40), point("03", 60)], 45);
+    expect(window).toEqual({
+      from: "2026-01-01T02:00Z",
+      to: "2026-01-01T03:30Z",
+      averageIntensity: 50,
+      unit: "gCO2eq/kWh",
+    });
+  });
+
+  it("returns undefined when the job is longer than the forecast", () => {
+    expect(bestWindow([point("00", 10)], 60)).toBeUndefined();
+  });
+});
+
+describe("bestDay", () => {
+  const bmrs = {
+    unit: "MW" as const,
+    publishTime: "2026-10-17T10:15:00Z",
+    forecast: [
+      { date: "2026-10-19", surplus: 6000 },
+      { date: "2026-10-20", surplus: 9000 },
+    ],
+  };
+
+  it("picks the top-ranked day", () => {
+    const days = [
+      { date: "2026-10-19", percentageOfDemand: 30, dayRank: 1 },
+      { date: "2026-10-20", percentageOfDemand: 20, dayRank: 2 },
+    ];
+    expect(bestDay(bmrs, days)).toEqual({ date: "2026-10-19", surplus: 6000, percentageOfDemand: 30 });
+  });
+
+  it("returns the day ranked 1, whatever order the days arrive in", () => {
+    const days = [
+      { date: "2026-10-20", dayRank: 1 },
+      { date: "2026-10-19", dayRank: 2 },
+    ];
+    expect(bestDay(bmrs, days)).toEqual({ date: "2026-10-20", surplus: 9000 });
   });
 });

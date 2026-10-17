@@ -1,5 +1,5 @@
-import { UpstreamError } from "../errors.js";
 import type { Horizon } from "../types.js";
+import { fetchJson } from "./http.js";
 
 const BASE_URL = "https://api.electricitymap.org/v3";
 
@@ -29,6 +29,7 @@ export interface ElectricityMapsZone {
 
 export type ElectricityMapsZones = Record<string, ElectricityMapsZone>;
 
+/** How many hours of forecast to request for a horizon. */
 function horizonToHours(horizon: Horizon): number {
   switch (horizon) {
     case "24h":
@@ -40,33 +41,21 @@ function horizonToHours(horizon: Horizon): number {
   }
 }
 
-async function get<T>(token: string, path: string, params: Record<string, string>): Promise<T> {
+/** Fetches an Electricity Maps API path as JSON. */
+function get<T>(token: string, path: string, params: Record<string, string>): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
-
-  let response: Response;
-  try {
-    response = await fetch(url, { headers: { "auth-token": token } });
-  } catch (cause) {
-    throw new UpstreamError("Failed to reach Electricity Maps", "electricitymaps");
-  }
-
-  if (!response.ok) {
-    throw new UpstreamError(
-      `Electricity Maps responded with ${response.status}`,
-      "electricitymaps",
-    );
-  }
-
-  return (await response.json()) as T;
+  return fetchJson<T>(url, "electricitymaps", "Electricity Maps", { headers: { "auth-token": token } });
 }
 
+/** Fetches the latest carbon intensity for a zone. */
 export function getLatestIntensity(token: string, zone: string): Promise<ElectricityMapsLatest> {
   return get<ElectricityMapsLatest>(token, "/carbon-intensity/latest", { zone });
 }
 
+/** Fetches a zone's carbon intensity forecast for the horizon. */
 export function getForecast(
   token: string,
   zone: string,
@@ -78,6 +67,7 @@ export function getForecast(
   });
 }
 
+/** Fetches the list of zones Electricity Maps supports. */
 export function listZones(token: string): Promise<ElectricityMapsZones> {
   return get<ElectricityMapsZones>(token, "/zones", {});
 }

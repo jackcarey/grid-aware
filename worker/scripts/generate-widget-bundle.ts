@@ -5,6 +5,7 @@ import { build } from "esbuild";
 const outDir = fileURLToPath(new URL("../public/grid-aware", import.meta.url));
 mkdirSync(outDir, { recursive: true });
 
+/** Bundles one browser package entry point into public/. */
 async function bundle(entryName: string, format: "esm" | "iife", outName: string): Promise<void> {
   const entryPoint = fileURLToPath(
     new URL(`../../packages/grid-aware/src/${entryName}`, import.meta.url),

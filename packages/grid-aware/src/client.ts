@@ -1,7 +1,7 @@
 import createClient from "openapi-fetch";
 import type { components, paths } from "./client.gen.js";
 
-/** `/v1/intensity` API response. */
+/** `/v2/intensity` API response. */
 export type GridIntensityData = components["schemas"]["GridIntensityResponse"];
 export type ForecastHorizon = "24h" | "48h";
 
@@ -12,6 +12,8 @@ export interface IntensityQuery {
   postcode?: string;
   /** UK DNO region ID (1-14). */
   regionid?: number;
+  /** Include `surplus` on GB responses. Pass a job length in minutes to size the suggested window (default 30). */
+  surplus?: boolean | number;
 }
 
 export interface GridAwareClient {
@@ -28,7 +30,14 @@ export function createGridAwareClient(baseUrl: string): GridAwareClient {
   async function fetchIntensity(
     query: IntensityQuery & { horizon: "latest" | ForecastHorizon },
   ): Promise<GridIntensityData> {
-    const { data, error } = await client.GET("/v1/intensity", { params: { query } });
+    const { data, error } = await client.GET("/v2/intensity", {
+      params: {
+        query: {
+          ...query,
+          surplus: typeof query.surplus === "number" ? query.surplus : query.surplus ? "true" : undefined,
+        },
+      },
+    });
     if (error || !data) throw new Error("grid-aware: failed to fetch intensity data");
     return data;
   }

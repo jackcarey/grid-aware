@@ -6,6 +6,10 @@ export const introHtml = `<h1>grid-aware</h1>
   falling back to Electricity Maps' annual averages via <a href="https://www.thegreenwebfoundation.org/co2-js/">CO2.js</a> when live data is unavailable.
 </p>
 <p>
+  Add <code>surplus=true</code> to GB requests for NESO's surplus forecast from
+  <a href="https://bmrs.elexon.co.uk/surplus-forecast-and-margin">Elexon BMRS</a> and a suggested time to run compute.
+</p>
+<p>
   Read about the scope and caveats on the <a href="https://jackcarey.co.uk/projects/grid-aware/">project page</a> and <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> with questions or feedback.
 </p>
 
@@ -18,12 +22,14 @@ export const introHtml = `<h1>grid-aware</h1>
   <summary>Full API response</summary>
   <pre id="live-response">loading&hellip;</pre>
 </details>
+<ul id="live-attribution"></ul>
 <script type="module">
   import { initGridAware } from "/grid-aware/index.js";
   const valueEl = document.getElementById("live-intensity-value");
   const mixEl = document.getElementById("live-mix");
   const mixListEl = document.getElementById("live-mix-list");
   const responseEl = document.getElementById("live-response");
+  const attributionEl = document.getElementById("live-attribution");
   const liveQueryEl = document.getElementById("live-query");
   initGridAware({
     apiBaseUrl: location.origin,
@@ -43,6 +49,19 @@ export const introHtml = `<h1>grid-aware</h1>
         }),
       );
       responseEl.textContent = JSON.stringify(data, null, 2);
+      // Each source's licence asks for its credit wherever the data is shown.
+      attributionEl.replaceChildren(
+        ...(data.attribution ?? []).map((entry) => {
+          const li = document.createElement("li");
+          const small = document.createElement("small");
+          const link = document.createElement("a");
+          link.href = entry.licence;
+          link.textContent = "licence";
+          small.append(entry.text + " (", link, ")");
+          li.append(small);
+          return li;
+        }),
+      );
       if (liveQueryEl) {
         liveQueryEl.textContent = "zone=" + data.location.zone;
       }
@@ -57,10 +76,10 @@ export const introHtml = `<h1>grid-aware</h1>
 </script>
 
 <h2>Try it</h2>
-<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?<span id="live-query">zone=FR</span>' \\
+<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v2/intensity?<span id="live-query">zone=FR</span>' \\
   -H 'Origin: https://your-allowed-site.example'</pre>
 <p>
-  Data endpoints (<code>/v1/*</code>) require the calling origin to be on this deployment's
+  Data endpoints (<code>/v2/*</code>, and the deprecated <code>/v1/*</code>) require the calling origin to be on this deployment's
   allowlist, to protect its own Electricity Maps quota - <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> to have yours added or <a href="https://github.com/jackcarey/grid-aware">deploy the code yourself</a>.
 </p>
 

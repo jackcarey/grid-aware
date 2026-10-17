@@ -231,7 +231,7 @@ describe("initGridAwareBlocking", () => {
 
     initGridAwareBlocking({ apiBaseUrl: "https://example.com/", zone: "FR", regionid: 13 });
 
-    expect(requestedUrl).toBe("https://example.com/v1/intensity?zone=FR&regionid=13");
+    expect(requestedUrl).toBe("https://example.com/v2/intensity?zone=FR&regionid=13");
   });
 
   it("falls back to unknown when the request fails", () => {

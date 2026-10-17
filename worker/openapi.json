@@ -2,12 +2,465 @@
   "openapi": "3.0.0",
   "info": {
     "title": "grid-aware",
-    "version": "1.2.1",
+    "version": "2.0.0",
     "description": "Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API."
   },
   "components": {
     "schemas": {
       "GridIntensityResponse": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "electricitymaps",
+              "neso",
+              "co2js"
+            ],
+            "example": "neso",
+            "description": "Which upstream answered this request"
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "zone": {
+                "type": "string",
+                "description": "Electricity Maps zone code (always \"GB\" for NESO responses)."
+              },
+              "region": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "number"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "nation": {
+                    "type": "string",
+                    "enum": [
+                      "England",
+                      "Scotland",
+                      "Wales"
+                    ]
+                  },
+                  "unknown": {
+                    "type": "boolean",
+                    "description": "True when none of id/name/nation could be determined for this request."
+                  }
+                },
+                "required": [
+                  "unknown"
+                ],
+                "description": "GB DNO region detail, when known. id/name are only ever present for NESO regional responses; nation may be present on its own when only a coarser signal (e.g. Cloudflare's detected nation) was available."
+              }
+            },
+            "required": [
+              "zone",
+              "region"
+            ],
+            "description": "Echoes back where this response is about, so you never have to re-parse the request."
+          },
+          "datetime": {
+            "type": "string",
+            "example": "2026-09-11T12:00:00.000Z",
+            "description": "Start of the reporting period, ISO 8601 UTC."
+          },
+          "validTo": {
+            "type": "string",
+            "description": "End of the reporting period, when known."
+          },
+          "carbonIntensity": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number",
+                "nullable": true,
+                "example": 123,
+                "description": "The carbon intensity figure, in `unit`. `null` when `band` is \"unknown\"."
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "gCO2eq/kWh"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "actual",
+                  "forecast",
+                  "estimated",
+                  "unknown"
+                ],
+                "description": "\"actual\" = measured (NESO national, when available), \"forecast\" = NESO's forward estimate (national fallback and all regional data), \"estimated\" = Electricity Maps' modeled figure (or its annual average, for CO2.js fallbacks), \"unknown\" = an upstream provider failed or returned unusable data."
+              },
+              "band": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "moderate",
+                  "high",
+                  "very-high",
+                  "unknown"
+                ],
+                "example": "moderate",
+                "description": "Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data, see `fallback.reason`."
+              }
+            },
+            "required": [
+              "value",
+              "unit",
+              "type",
+              "band"
+            ],
+            "description": "The carbon intensity figure itself."
+          },
+          "generationMix": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fuel": {
+                  "type": "string"
+                },
+                "percentage": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "fuel",
+                "percentage"
+              ]
+            },
+            "description": "Fuel mix behind this figure. Only returned for NESO regional responses."
+          },
+          "forecast": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastPoint"
+            },
+            "description": "Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is \"24h\" or \"48h\", and never for CO2.js fallbacks."
+          },
+          "surplus": {
+            "$ref": "#/components/schemas/Surplus"
+          },
+          "attribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "description": "Credits for each source used in this response. Keep them with the data if you display or redistribute it."
+          },
+          "fallback": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "description": "Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: \"co2js\"`), and only report `band`/`type` as \"unknown\" if the zone isn't in that dataset either."
+          }
+        },
+        "required": [
+          "source",
+          "location",
+          "datetime",
+          "carbonIntensity",
+          "attribution"
+        ]
+      },
+      "ForecastPoint": {
+        "type": "object",
+        "properties": {
+          "datetime": {
+            "type": "string",
+            "description": "Start of this period, ISO 8601 UTC."
+          },
+          "validTo": {
+            "type": "string",
+            "description": "End of this period, when known."
+          },
+          "value": {
+            "type": "number",
+            "nullable": true,
+            "description": "The carbon intensity figure, in `unit`. `null` when `band` is \"unknown\"."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "actual",
+              "forecast",
+              "estimated",
+              "unknown"
+            ]
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "low",
+              "moderate",
+              "high",
+              "very-high",
+              "unknown"
+            ],
+            "example": "moderate",
+            "description": "Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data, see `fallback.reason`."
+          },
+          "generationMix": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fuel": {
+                  "type": "string"
+                },
+                "percentage": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "fuel",
+                "percentage"
+              ]
+            },
+            "description": "Fuel mix for this period. Only present for NESO regional forecasts."
+          }
+        },
+        "required": [
+          "datetime",
+          "value",
+          "type",
+          "band"
+        ]
+      },
+      "Surplus": {
+        "type": "object",
+        "properties": {
+          "bmrs": {
+            "type": "object",
+            "properties": {
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "MW"
+                ]
+              },
+              "publishTime": {
+                "type": "string",
+                "description": "ISO 8601 UTC."
+              },
+              "forecast": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "example": "2026-10-19",
+                      "description": "UK local date."
+                    },
+                    "surplus": {
+                      "type": "number",
+                      "example": 6398,
+                      "description": "MW at the day's peak half hour."
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "surplus"
+                  ]
+                },
+                "description": "2-14 days ahead."
+              }
+            },
+            "required": [
+              "unit",
+              "publishTime",
+              "forecast"
+            ],
+            "description": "NESO's National Surplus Forecast from Elexon BMRS (OCNMFD). GB-wide. Omitted if BMRS is unavailable."
+          },
+          "derived": {
+            "type": "object",
+            "properties": {
+              "forecast": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "example": "2026-10-19"
+                    },
+                    "percentageOfDemand": {
+                      "type": "number",
+                      "example": 17.8,
+                      "description": "Surplus as a % of forecast national demand (BMRS NDFD). Absent when there's no demand forecast for the day."
+                    },
+                    "windPercentageOfCapacity": {
+                      "type": "number",
+                      "example": 63.4,
+                      "description": "Average forecast wind output as a % of wind capacity (NESO 14-day wind forecast). Transmission-connected wind only. Absent for part-days."
+                    },
+                    "dayRank": {
+                      "type": "integer",
+                      "example": 1,
+                      "description": "Rank for running deferrable compute, 1 being best. Days with spare capacity (`surplus` above 0) come first, so extra load doesn't land on a grid short of capacity. Then wind share, as a stand-in for lower carbon this far ahead; days within 5 percentage points of each other (e.g. 60% and 65%) count as equal, as the forecast isn't that precise. Then higher `percentageOfDemand`, since the same spare MW is more headroom on a quieter day (raw MW if there's no demand forecast). Then the earlier date, so no two days share a rank."
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "dayRank"
+                  ]
+                },
+                "description": "One entry per `bmrs.forecast` day."
+              },
+              "regional": {
+                "type": "object",
+                "properties": {
+                  "renewablePercentage": {
+                    "type": "number",
+                    "example": 62.5,
+                    "description": "Wind + solar + hydro share of the region's current mix, as a %."
+                  }
+                },
+                "required": [
+                  "renewablePercentage"
+                ],
+                "description": "A proxy, not a measured surplus. Regional responses only."
+              },
+              "suggested": {
+                "type": "object",
+                "properties": {
+                  "window": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string",
+                        "description": "ISO 8601 UTC. May be the start of the current period."
+                      },
+                      "to": {
+                        "type": "string",
+                        "description": "ISO 8601 UTC."
+                      },
+                      "averageIntensity": {
+                        "type": "number",
+                        "example": 42
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "gCO2eq/kWh"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to",
+                      "averageIntensity",
+                      "unit"
+                    ],
+                    "description": "Lowest average intensity window in the next 48 hours that fits the job length from `surplus`. Earliest wins a tie."
+                  },
+                  "day": {
+                    "type": "object",
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "example": "2026-10-23"
+                      },
+                      "surplus": {
+                        "type": "number",
+                        "description": "MW."
+                      },
+                      "percentageOfDemand": {
+                        "type": "number"
+                      },
+                      "windPercentageOfCapacity": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "date",
+                      "surplus"
+                    ],
+                    "description": "The day with `dayRank` 1."
+                  }
+                },
+                "description": "When to run deferrable compute."
+              }
+            },
+            "description": "Calculated by grid-aware, not published by NESO or Elexon."
+          }
+        },
+        "description": "Present on NESO responses when `surplus=true`."
+      },
+      "Attribution": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "neso",
+              "neso-data-portal",
+              "electricitymaps",
+              "co2js",
+              "bmrs"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "example": "Contains BMRS data © Elexon Limited copyright and database right 2026",
+            "description": "Credit required by the source's licence or terms."
+          },
+          "licence": {
+            "type": "string",
+            "description": "Licence or terms link."
+          },
+          "url": {
+            "type": "string",
+            "description": "Data source link."
+          }
+        },
+        "required": [
+          "source",
+          "text",
+          "licence",
+          "url"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "electricitymaps",
+                  "neso",
+                  "bmrs"
+                ]
+              }
+            },
+            "required": [
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "GridIntensityResponseV1": {
         "type": "object",
         "properties": {
           "source": {
@@ -162,97 +615,37 @@
           "carbonIntensity"
         ]
       },
-      "ForecastPoint": {
+      "ZoneList": {
         "type": "object",
         "properties": {
-          "datetime": {
-            "type": "string",
-            "description": "Start of this period, ISO 8601 UTC."
-          },
-          "validTo": {
-            "type": "string",
-            "description": "End of this period, when known."
-          },
-          "value": {
-            "type": "number",
-            "nullable": true,
-            "description": "The carbon intensity figure, in `unit`. `null` when `band` is \"unknown\"."
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "actual",
-              "forecast",
-              "estimated",
-              "unknown"
-            ]
-          },
-          "band": {
-            "type": "string",
-            "enum": [
-              "low",
-              "moderate",
-              "high",
-              "very-high",
-              "unknown"
-            ],
-            "example": "moderate",
-            "description": "Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. \"unknown\" means an upstream provider failed or returned unusable data, see `fallback.reason`."
-          },
-          "generationMix": {
-            "type": "array",
-            "items": {
+          "zones": {
+            "type": "object",
+            "additionalProperties": {
               "type": "object",
               "properties": {
-                "fuel": {
+                "zoneName": {
                   "type": "string"
                 },
-                "percentage": {
-                  "type": "number"
+                "countryName": {
+                  "type": "string"
                 }
-              },
-              "required": [
-                "fuel",
-                "percentage"
-              ]
-            },
-            "description": "Fuel mix for this period. Only present for NESO regional forecasts."
-          }
-        },
-        "required": [
-          "datetime",
-          "value",
-          "type",
-          "band"
-        ]
-      },
-      "Error": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "message": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string",
-                "enum": [
-                  "electricitymaps",
-                  "neso"
-                ]
               }
+            }
+          },
+          "attribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
             },
-            "required": [
-              "message"
-            ]
+            "description": "Credits for each source used in this response. Keep them with the data if you display or redistribute it."
           }
         },
         "required": [
-          "error"
+          "zones",
+          "attribution"
         ]
       },
-      "ZoneList": {
+      "ZoneListV1": {
         "type": "object",
         "additionalProperties": {
           "type": "object",
@@ -270,10 +663,134 @@
     "parameters": {}
   },
   "paths": {
+    "/v2/intensity": {
+      "get": {
+        "summary": "Get combined grid carbon intensity",
+        "description": "Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "FR",
+              "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country)."
+            },
+            "required": false,
+            "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country).",
+            "name": "zone",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "SW1A"
+            },
+            "required": false,
+            "name": "postcode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "example": 13
+            },
+            "required": false,
+            "name": "regionid",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "24h",
+                "48h"
+              ],
+              "default": "latest"
+            },
+            "required": false,
+            "name": "horizon",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "electricitymaps",
+                "neso"
+              ],
+              "default": "auto"
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2880
+                }
+              ],
+              "default": "false",
+              "example": 90,
+              "description": "Adds `surplus` to GB (NESO) responses. Pass a job length in minutes (max 2880) to size `surplus.derived.suggested.window`, or \"true\" for 30."
+            },
+            "required": false,
+            "description": "Adds `surplus` to GB (NESO) responses. Pass a job length in minutes (max 2880) to size `surplus.derived.suggested.window`, or \"true\" for 30.",
+            "name": "surplus",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Normalized grid carbon intensity for the requested location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridIntensityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "NESO-only data requested from a non-UK origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/intensity": {
       "get": {
         "summary": "Get combined grid carbon intensity",
         "description": "Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).",
+        "deprecated": true,
         "parameters": [
           {
             "schema": {
@@ -336,11 +853,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Normalized grid carbon intensity for the requested location",
+            "description": "1.x response shape. Use /v2/intensity.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GridIntensityResponse"
+                  "$ref": "#/components/schemas/GridIntensityResponseV1"
                 }
               }
             }
@@ -368,7 +885,7 @@
         }
       }
     },
-    "/v1/zones": {
+    "/v2/zones": {
       "get": {
         "summary": "List Electricity Maps zones",
         "responses": {
@@ -378,6 +895,24 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ZoneList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones": {
+      "get": {
+        "summary": "List Electricity Maps zones",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "1.x response shape. Use /v2/zones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneListV1"
                 }
               }
             }

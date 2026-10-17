@@ -1,4 +1,4 @@
-export type ProviderName = "electricitymaps" | "neso";
+export type ProviderName = "electricitymaps" | "neso" | "bmrs";
 
 export class ApiError extends Error {
   constructor(
@@ -39,6 +39,7 @@ export class UpstreamError extends ApiError {
   }
 }
 
+/** Turns an API error into the JSON error body sent to callers. */
 export function errorBody(err: ApiError): { error: { message: string; provider?: ProviderName } } {
   return { error: { message: err.message, provider: err.provider } };
 }

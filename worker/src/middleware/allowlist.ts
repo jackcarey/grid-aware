@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { ForbiddenError } from "../errors.js";
 
+/** Gets the origin part of a Referer header, for callers that don't send Origin. */
 function originFromReferer(referer: string | undefined): string | undefined {
   if (!referer) return undefined;
   try {
@@ -11,8 +12,10 @@ function originFromReferer(referer: string | undefined): string | undefined {
   }
 }
 
-// "https://*.example.com" allows any subdomain but not the apex domain itself -
-// list that separately if it also needs access.
+/**
+ * Turns a wildcard origin into a regex. "https://*.example.com" allows any subdomain but not the
+ * apex domain itself - list that separately if it also needs access.
+ */
 function wildcardToRegExp(pattern: string): RegExp | undefined {
   const marker = "://*.";
   const markerIndex = pattern.indexOf(marker);

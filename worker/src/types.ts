@@ -1,3 +1,5 @@
+import type { ElectricityMapsZones } from "./providers/electricityMaps.js";
+
 export type Band = "low" | "moderate" | "high" | "very-high" | "unknown";
 
 export interface RegionInfo {
@@ -38,6 +40,66 @@ export interface ForecastPoint {
   generationMix?: GenerationMixEntry[];
 }
 
+export interface BmrsSurplusDay {
+  date: string;
+  surplus: number;
+}
+
+export type SourceName = "neso" | "neso-data-portal" | "electricitymaps" | "co2js" | "bmrs";
+
+export interface Attribution {
+  source: SourceName;
+  text: string;
+  licence: string;
+  url: string;
+}
+
+export interface BmrsSurplus {
+  unit: "MW";
+  publishTime: string;
+  forecast: BmrsSurplusDay[];
+}
+
+export interface DerivedSurplusDay {
+  date: string;
+  /** Absent when BMRS has no demand forecast for this date. */
+  percentageOfDemand?: number;
+  /** Absent when NESO's wind forecast doesn't cover the whole day. */
+  windPercentageOfCapacity?: number;
+  /** 1 = the best day in this forecast window. */
+  dayRank: number;
+}
+
+export interface SuggestedWindow {
+  from: string;
+  to: string;
+  averageIntensity: number;
+  unit: "gCO2eq/kWh";
+}
+
+export interface SuggestedDay {
+  date: string;
+  surplus: number;
+  percentageOfDemand?: number;
+  windPercentageOfCapacity?: number;
+}
+
+export interface SuggestedCompute {
+  window?: SuggestedWindow;
+  day?: SuggestedDay;
+}
+
+export interface DerivedSurplus {
+  forecast?: DerivedSurplusDay[];
+  regional?: { renewablePercentage: number };
+  suggested?: SuggestedCompute;
+}
+
+export interface Surplus {
+  bmrs?: BmrsSurplus;
+  derived: DerivedSurplus;
+}
+
 export interface GridIntensityResponse {
   source: "electricitymaps" | "neso" | "co2js";
   location: RequestedLocation;
@@ -47,7 +109,19 @@ export interface GridIntensityResponse {
   generationMix?: GenerationMixEntry[];
   /** Absent for horizon=latest, which has no series to show. */
   forecast?: ForecastPoint[];
+  /** GB only: Electricity Maps and CO2.js responses never carry it. */
+  surplus?: Surplus;
+  /** One entry per source whose data is in this response. */
+  attribution: Attribution[];
   fallback?: Fallback;
+}
+
+/** A response before its attribution is worked out from what's in it. */
+export type IntensityBody = Omit<GridIntensityResponse, "attribution">;
+
+export interface ZoneListResponse {
+  zones: ElectricityMapsZones;
+  attribution: Attribution[];
 }
 
 export interface ZoneListEntry {

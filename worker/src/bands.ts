@@ -38,6 +38,7 @@ export const DEFAULT_BAND_THRESHOLDS: BandThresholds = {
   veryHigh: 500,
 };
 
+/** Buckets an intensity value into a band using generic global thresholds. */
 export function bandFromValue(
   value: number,
   thresholds: BandThresholds = DEFAULT_BAND_THRESHOLDS,
