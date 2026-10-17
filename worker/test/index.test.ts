@@ -367,32 +367,27 @@ describe("app: /v1/intensity", () => {
   });
 
   it("shares one NESO all-regions fetch once regional traffic is rate-limited", async () => {
+    // NESO's all-regions endpoint groups by period, not by region.
     const fetchMock = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
             data: [
               {
-                regionid: 3,
-                dnoregion: "North West England",
-                shortname: "North West England",
-                data: [
+                from: "2026-01-01T00:00Z",
+                to: "2026-01-01T00:30Z",
+                regions: [
                   {
-                    from: "2026-01-01T00:00Z",
-                    to: "2026-01-01T00:30Z",
+                    regionid: 3,
+                    dnoregion: "North West England",
+                    shortname: "North West England",
                     intensity: { forecast: 100, index: "moderate" },
                     generationmix: [],
                   },
-                ],
-              },
-              {
-                regionid: 8,
-                dnoregion: "West Midlands",
-                shortname: "West Midlands",
-                data: [
                   {
-                    from: "2026-01-01T00:00Z",
-                    to: "2026-01-01T00:30Z",
+                    regionid: 8,
+                    dnoregion: "West Midlands",
+                    shortname: "West Midlands",
                     intensity: { forecast: 150, index: "moderate" },
                     generationmix: [],
                   },
