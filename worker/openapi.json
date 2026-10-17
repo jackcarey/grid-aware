@@ -309,7 +309,7 @@
                     "dayRank": {
                       "type": "integer",
                       "example": 1,
-                      "description": "Rank for running deferrable compute, 1 being best. Days with spare capacity (`surplus` above 0) come first, so extra load doesn't land on a tight grid. Then wind share, as a stand-in for lower carbon this far ahead; days within 5 points count as equal, as the forecast isn't that precise. Then `percentageOfDemand` (raw MW if there's no demand forecast), so the most slack wins. Then the earlier date, so no two days share a rank."
+                      "description": "Rank for running deferrable compute, 1 being best. Days with spare capacity (`surplus` above 0) come first, so extra load doesn't land on a grid short of capacity. Then wind share, as a stand-in for lower carbon this far ahead; days within 5 percentage points of each other (e.g. 60% and 65%) count as equal, as the forecast isn't that precise. Then higher `percentageOfDemand`, since the same spare MW is more headroom on a quieter day (raw MW if there's no demand forecast). Then the earlier date, so no two days share a rank."
                     }
                   },
                   "required": [

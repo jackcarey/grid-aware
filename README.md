@@ -63,13 +63,12 @@ data are cached for an hour. If either source is down, the fields based on it ar
 
 #### Day ranking
 
-Days are ordered by:
+Days are scored by:
 
-1. Spare capacity (`surplus` above 0) first, so extra load doesn't land on a tight grid.
-2. Wind share, as a stand-in for lower carbon, since there's no intensity forecast this far ahead.
-   Days within 5 points count as equal, as the forecast isn't that precise.
-3. `percentageOfDemand`, so the day with the most slack wins.
-4. The earlier date, so no two days share a rank.
+1. Spare capacity (`surplus` above 0) first, so extra load doesn't land on a grid short of capacity.
+2. Wind share, as a stand-in for lower carbon, since there's no intensity forecast this far ahead. Days within 5% of each other count as equal, as the forecast isn't that precise.
+3. Higher `percentageOfDemand` (surplus as a % of forecast demand), since the same spare MW is more headroom on a quieter day. Raw MW is used if there's no demand forecast.
+4. The earlier date, so no two days share a rank and compute happens sooner.
 
 ### Attribution
 

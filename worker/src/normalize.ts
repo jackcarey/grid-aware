@@ -29,13 +29,13 @@ export function normalizeBmrsSurplus(surplus: readonly BmrsSurplusDaily[]): Bmrs
   };
 }
 
-/** Wind forecasts aren't precise enough for smaller gaps to mean a day is cleaner. */
+/** In percentage points of wind capacity. Wind forecasts aren't precise enough for smaller gaps to mean a day is cleaner. */
 const WIND_GROUP_POINTS = 5;
 
 /**
  * Gives each day its surplus as a share of demand, since raw MW means different things in winter
  * and summer, and its forecast wind share. Ranks days 1..n by:
- * 1. a positive surplus, so the grid isn't tight;
+ * 1. a positive surplus, so the grid isn't short of capacity;
  * 2. wind, grouping days within WIND_GROUP_POINTS of the windiest day left;
  * 3. the highest share of demand (raw MW if no day has a demand forecast, since mixing the two
  *    would favour whichever days happen to lack one);
