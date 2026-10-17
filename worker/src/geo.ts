@@ -1,5 +1,6 @@
 export const UK_COUNTRY_CODE = "GB";
 
+/** True when Cloudflare says the request came from the UK. */
 export function isUkRequest(country: string | undefined): boolean {
   return country === UK_COUNTRY_CODE;
 }

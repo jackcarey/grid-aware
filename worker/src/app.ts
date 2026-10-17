@@ -7,6 +7,7 @@ import type { AppDeps, AppEnv } from "./ports.js";
 import { registerIntensityRoute } from "./routes/intensity.js";
 import { registerZonesRoute } from "./routes/zones.js";
 
+/** Builds the API app with its routes and middleware, wired to the given dependencies. */
 export function createApp(deps: AppDeps): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 

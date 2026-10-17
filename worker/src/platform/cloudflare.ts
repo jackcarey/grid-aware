@@ -11,6 +11,7 @@ export interface Env {
   ASSETS: Fetcher;
 }
 
+/** Cache store backed by Cloudflare's edge cache, which is separate for each data centre. */
 export function createCloudflareCacheStore(ctx: ExecutionContext): CacheStore {
   const cache = caches.default;
   return {
@@ -25,16 +26,19 @@ export function createCloudflareCacheStore(ctx: ExecutionContext): CacheStore {
   };
 }
 
+/** Cloudflare's detected country code for the request. */
 export function getCountry(request: Request): string | undefined {
   const cf = (request as Request & { cf?: { country?: string } }).cf;
   return cf?.country;
 }
 
+/** Cloudflare's detected postcode, cut down to its outward code. */
 export function getPostcode(request: Request): string | undefined {
   const cf = (request as Request & { cf?: { postalCode?: string } }).cf;
   return cf?.postalCode ? toOutwardPostcode(cf.postalCode) : undefined;
 }
 
+/** Cloudflare's detected city for the request. */
 export function getCity(request: Request): string | undefined {
   const cf = (request as Request & { cf?: { city?: string } }).cf;
   return cf?.city;
@@ -54,6 +58,7 @@ export function getColo(request: Request): string | undefined {
 
 const GB_REGIONAL_RATE_LIMIT_KEY = "gb-regional";
 
+/** True once GB regional traffic is over its limit, so requests should share one all-regions fetch. */
 export async function isOverRegionalRateLimit(rateLimiter: RateLimit): Promise<boolean> {
   const { success } = await rateLimiter.limit({ key: GB_REGIONAL_RATE_LIMIT_KEY });
   return !success;
@@ -61,6 +66,7 @@ export async function isOverRegionalRateLimit(rateLimiter: RateLimit): Promise<b
 
 const API_RATE_LIMIT_KEY = "v1-global";
 
+/** True once total API traffic is over the deployment's hard limit. */
 export async function isOverApiRateLimit(rateLimiter: RateLimit): Promise<boolean> {
   const { success } = await rateLimiter.limit({ key: API_RATE_LIMIT_KEY });
   return !success;

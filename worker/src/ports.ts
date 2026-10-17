@@ -25,6 +25,7 @@ export interface AppDeps {
 /** Hono generic env: how route handlers access AppDeps via `c.get("deps")`. */
 export type AppEnv = { Variables: { deps: AppDeps } };
 
+/** Cache store held in memory, for tests and non-Cloudflare hosts. */
 export function createInMemoryCacheStore(): CacheStore {
   const store = new Map<string, { response: Response; expiresAt: number }>();
   return {
@@ -43,6 +44,7 @@ export function createInMemoryCacheStore(): CacheStore {
   };
 }
 
+/** Dependencies that detect nothing and never rate limit, with any overrides applied. Handy for tests. */
 export function createNoopAppDeps(overrides: Partial<AppDeps> = {}): AppDeps {
   return {
     electricityMapsToken: undefined,
