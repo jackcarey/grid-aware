@@ -60,7 +60,7 @@ function intensityRequestUrl(
   if (subject.regionid !== undefined) params.set("regionid", String(subject.regionid));
   const query = params.toString();
   const baseUrl = apiBaseUrl.endsWith("/") ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
-  return `${baseUrl}/v1/intensity${query ? `?${query}` : ""}`;
+  return `${baseUrl}/v2/intensity${query ? `?${query}` : ""}`;
 }
 
 interface CacheEntry {

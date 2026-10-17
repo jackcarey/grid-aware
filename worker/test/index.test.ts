@@ -876,10 +876,10 @@ describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
   });
 });
 
-describe("app: /v1/zones allowlist", () => {
+describe("app: /v2/zones", () => {
   it("rejects a disallowed origin", async () => {
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/zones", {
+    const res = await app.request("/v2/zones", {
       headers: { Origin: "https://evil.example" },
     });
     expect(res.status).toBe(403);
@@ -896,19 +896,57 @@ describe("app: /v1/zones allowlist", () => {
       ),
     );
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/zones", {
+    const res = await app.request("/v2/zones", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+    expect(await res.json()).toEqual({ FR: { zoneName: "France" } });
   });
 
   it("serves the CO2.js zone list when no token is configured", async () => {
     const app = createApp(buildDeps({ electricityMapsToken: undefined }));
-    const res = await app.request("/v1/zones", {
+    const res = await app.request("/v2/zones", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.GB).toEqual({ zoneName: "Great Britain" });
+  });
+});
+
+describe("app: /v1 is deprecated", () => {
+  const nesoNational = {
+    data: [
+      {
+        from: "2026-01-01T00:00Z",
+        to: "2026-01-01T00:30Z",
+        intensity: { actual: 100, forecast: 100, index: "moderate" },
+      },
+    ],
+  };
+
+  it("returns the bare zone map on /v1/zones", async () => {
+    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
+    const res = await app.request("/v1/zones", { headers: { Origin: ALLOWED_ORIGIN } });
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.GB).toEqual({ zoneName: "Great Britain" });
+    expect(body).not.toHaveProperty("zones");
+  });
+
+  it("points /v1 callers at the same request on /v2", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(nesoNational), { status: 200 })));
+    const app = createApp(buildDeps());
+    const res = await app.request("/v1/intensity?zone=GB&horizon=latest", {
+      headers: { Origin: ALLOWED_ORIGIN },
+    });
+    expect(res.headers.get("Deprecation")).toBe("true");
+    expect(res.headers.get("Link")).toBe('</v2/intensity?zone=GB&horizon=latest>; rel="successor-version"');
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+  });
+
+  it("doesn't mark /v2 as deprecated", async () => {
+    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
+    const res = await app.request("/v2/zones", { headers: { Origin: ALLOWED_ORIGIN } });
+    expect(res.headers.get("Deprecation")).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "grid-aware",
-    "version": "1.2.1",
+    "version": "2.0.0",
     "description": "Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API."
   },
   "components": {
@@ -271,7 +271,7 @@
     "parameters": {}
   },
   "paths": {
-    "/v1/intensity": {
+    "/v2/intensity": {
       "get": {
         "summary": "Get combined grid carbon intensity",
         "description": "Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).",
@@ -369,12 +369,129 @@
         }
       }
     },
-    "/v1/zones": {
+    "/v1/intensity": {
+      "get": {
+        "summary": "Get combined grid carbon intensity",
+        "description": "Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).",
+        "deprecated": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "FR",
+              "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country)."
+            },
+            "required": false,
+            "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country).",
+            "name": "zone",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "SW1A"
+            },
+            "required": false,
+            "name": "postcode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "example": 13
+            },
+            "required": false,
+            "name": "regionid",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "latest",
+                "24h",
+                "48h"
+              ],
+              "default": "latest"
+            },
+            "required": false,
+            "name": "horizon",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "electricitymaps",
+                "neso"
+              ],
+              "default": "auto"
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Use /v2/intensity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridIntensityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "NESO-only data requested from a non-UK origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/zones": {
       "get": {
         "summary": "List Electricity Maps zones",
         "responses": {
           "200": {
             "description": "Electricity Maps' supported zone list, proxied so clients never need their own token. Falls back to the zones in CO2.js's annual dataset when there's no token or Electricity Maps is unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/zones": {
+      "get": {
+        "summary": "List Electricity Maps zones",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "Use /v2/zones.",
             "content": {
               "application/json": {
                 "schema": {

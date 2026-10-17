@@ -1,7 +1,7 @@
 // GENERATED FILE - do not edit by hand.
 // Run `npm run generate:client` (openapi-typescript against ../../worker/openapi.json).
 export interface paths {
-    "/v1/intensity": {
+    "/v2/intensity": {
         parameters: {
             query?: never;
             header?: never;
@@ -65,7 +65,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/zones": {
+    "/v1/intensity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get combined grid carbon intensity
+         * @deprecated
+         * @description Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country). */
+                    zone?: string;
+                    postcode?: string;
+                    regionid?: number | null;
+                    horizon?: "latest" | "24h" | "48h";
+                    source?: "auto" | "electricitymaps" | "neso";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Use /v2/intensity. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GridIntensityResponse"];
+                    };
+                };
+                /** @description Missing or invalid query parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description NESO-only data requested from a non-UK origin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/zones": {
         parameters: {
             query?: never;
             header?: never;
@@ -83,6 +148,45 @@ export interface paths {
             requestBody?: never;
             responses: {
                 /** @description Electricity Maps' supported zone list, proxied so clients never need their own token. Falls back to the zones in CO2.js's annual dataset when there's no token or Electricity Maps is unreachable. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ZoneList"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Electricity Maps zones
+         * @deprecated
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Use /v2/zones. */
                 200: {
                     headers: {
                         [name: string]: unknown;

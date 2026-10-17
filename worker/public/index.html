@@ -84,10 +84,10 @@
 </script>
 
 <h2>Try it</h2>
-<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v1/intensity?<span id="live-query">zone=FR</span>' \
+<pre>curl '<span class="this-worker-url">https://your-deployed-url.com</span>/v2/intensity?<span id="live-query">zone=FR</span>' \
   -H 'Origin: https://your-allowed-site.example'</pre>
 <p>
-  Data endpoints (<code>/v1/*</code>) require the calling origin to be on this deployment's
+  Data endpoints (<code>/v2/*</code>, and the deprecated <code>/v1/*</code>) require the calling origin to be on this deployment's
   allowlist, to protect its own Electricity Maps quota - <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> to have yours added or <a href="https://github.com/jackcarey/grid-aware">deploy the code yourself</a>.
 </p>
 
@@ -113,12 +113,12 @@
 <pre>&lt;script src="<span class="this-worker-url">https://your-deployed-url.com</span>/grid-aware/blocking.js"
         data-api-base-url="<span class="this-worker-url">https://your-deployed-url.com</span>"&gt;&lt;/script&gt;</pre>
 
-<h2 id="api-reference">API reference <small>v1.2.1</small></h2>
+<h2 id="api-reference">API reference <small>v2.0.0</small></h2>
 <p>Combined global (Electricity Maps) and UK-regional (NESO) grid carbon intensity API.</p>
 <p>Raw spec: <a href="/openapi.json">/openapi.json</a></p>
 
 <section>
-  <h3><code>GET /v1/intensity</code></h3>
+  <h3><code>GET /v2/intensity</code></h3>
   <p>Get combined grid carbon intensity</p>
   <p>Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).</p>
   <h4>Parameters</h4>
@@ -247,13 +247,157 @@
 </section>
 
 <section>
-  <h3><code>GET /v1/zones</code></h3>
+  <h3><code>GET /v1/intensity</code></h3>
+  <p>Get combined grid carbon intensity</p>
+  <p>Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).</p>
+  <h4>Parameters</h4>
+  <table>
+<thead><tr><th>Name</th><th>In</th><th>Required</th><th>Type</th><th>Default</th></tr></thead>
+<tbody><tr><td><code>zone</code></td><td>query</td><td>no</td><td><code>string</code></td><td></td></tr>
+<tr><td><code>postcode</code></td><td>query</td><td>no</td><td><code>string</code></td><td></td></tr>
+<tr><td><code>regionid</code></td><td>query</td><td>no</td><td><code>integer</code></td><td></td></tr>
+<tr><td><code>horizon</code></td><td>query</td><td>no</td><td><code>latest | 24h | 48h</code></td><td>latest</td></tr>
+<tr><td><code>source</code></td><td>query</td><td>no</td><td><code>auto | electricitymaps | neso</code></td><td>auto</td></tr></tbody>
+</table>
+  <h4>Responses</h4>
+  <h4><code>200</code> - Use /v2/intensity.</h4>
+<pre>{
+  source: "electricitymaps" | "neso" | "co2js"
+  location: {
+    zone: string
+    region: {
+      id?: number
+      name?: string
+      nation?: "England" | "Scotland" | "Wales"
+      unknown: boolean
+    }
+  }
+  datetime: string
+  validTo?: string
+  carbonIntensity: {
+    value: number
+    unit: "gCO2eq/kWh"
+    type: "actual" | "forecast" | "estimated" | "unknown"
+    band: "low" | "moderate" | "high" | "very-high" | "unknown"
+  }
+  generationMix?: {
+    fuel: string
+    percentage: number
+  }[]
+  forecast?: {
+    datetime: string
+    validTo?: string
+    value: number
+    type: "actual" | "forecast" | "estimated" | "unknown"
+    band: "low" | "moderate" | "high" | "very-high" | "unknown"
+    generationMix?: {
+      fuel: string
+      percentage: number
+    }[]
+  }[]
+  fallback?: {
+    reason: string
+  }
+}</pre>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody><tr><td><code>source</code></td><td><pre>"electricitymaps" | "neso" | "co2js"</pre></td><td>Which upstream answered this request</td></tr>
+<tr><td><code>location</code></td><td><pre>{
+  zone: string
+  region: {
+    id?: number
+    name?: string
+    nation?: "England" | "Scotland" | "Wales"
+    unknown: boolean
+  }
+}</pre></td><td>Echoes back where this response is about, so you never have to re-parse the request.</td></tr>
+<tr><td><code>location.zone</code></td><td><pre>string</pre></td><td>Electricity Maps zone code (always "GB" for NESO responses).</td></tr>
+<tr><td><code>location.region</code></td><td><pre>{
+  id?: number
+  name?: string
+  nation?: "England" | "Scotland" | "Wales"
+  unknown: boolean
+}</pre></td><td>GB DNO region detail, when known. id/name are only ever present for NESO regional responses; nation may be present on its own when only a coarser signal (e.g. Cloudflare's detected nation) was available.</td></tr>
+<tr><td><code>location.region.unknown</code></td><td><pre>boolean</pre></td><td>True when none of id/name/nation could be determined for this request.</td></tr>
+<tr><td><code>datetime</code></td><td><pre>string</pre></td><td>Start of the reporting period, ISO 8601 UTC.</td></tr>
+<tr><td><code>validTo</code></td><td><pre>string</pre></td><td>End of the reporting period, when known.</td></tr>
+<tr><td><code>carbonIntensity</code></td><td><pre>{
+  value: number
+  unit: "gCO2eq/kWh"
+  type: "actual" | "forecast" | "estimated" | "unknown"
+  band: "low" | "moderate" | "high" | "very-high" | "unknown"
+}</pre></td><td>The carbon intensity figure itself.</td></tr>
+<tr><td><code>carbonIntensity.value</code></td><td><pre>number</pre></td><td>The carbon intensity figure, in `unit`. `null` when `band` is "unknown".</td></tr>
+<tr><td><code>carbonIntensity.type</code></td><td><pre>"actual" | "forecast" | "estimated" | "unknown"</pre></td><td>"actual" = measured (NESO national, when available), "forecast" = NESO's forward estimate (national fallback and all regional data), "estimated" = Electricity Maps' modeled figure (or its annual average, for CO2.js fallbacks), "unknown" = an upstream provider failed or returned unusable data.</td></tr>
+<tr><td><code>carbonIntensity.band</code></td><td><pre>"low" | "moderate" | "high" | "very-high" | "unknown"</pre></td><td>Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.</td></tr>
+<tr><td><code>generationMix</code></td><td><pre>{
+  fuel: string
+  percentage: number
+}[]</pre></td><td>Fuel mix behind this figure. Only returned for NESO regional responses.</td></tr>
+<tr><td><code>forecast</code></td><td><pre>{
+  datetime: string
+  validTo?: string
+  value: number
+  type: "actual" | "forecast" | "estimated" | "unknown"
+  band: "low" | "moderate" | "high" | "very-high" | "unknown"
+  generationMix?: {
+    fuel: string
+    percentage: number
+  }[]
+}[]</pre></td><td>Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is "24h" or "48h", and never for CO2.js fallbacks.</td></tr>
+<tr><td><code>forecast.datetime</code></td><td><pre>string</pre></td><td>Start of this period, ISO 8601 UTC.</td></tr>
+<tr><td><code>forecast.validTo</code></td><td><pre>string</pre></td><td>End of this period, when known.</td></tr>
+<tr><td><code>forecast.value</code></td><td><pre>number</pre></td><td>The carbon intensity figure, in `unit`. `null` when `band` is "unknown".</td></tr>
+<tr><td><code>forecast.band</code></td><td><pre>"low" | "moderate" | "high" | "very-high" | "unknown"</pre></td><td>Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.</td></tr>
+<tr><td><code>forecast.generationMix</code></td><td><pre>{
+  fuel: string
+  percentage: number
+}[]</pre></td><td>Fuel mix for this period. Only present for NESO regional forecasts.</td></tr>
+<tr><td><code>fallback</code></td><td><pre>{
+  reason: string
+}</pre></td><td>Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: "co2js"`), and only report `band`/`type` as "unknown" if the zone isn't in that dataset either.</td></tr></tbody>
+</table>
+<h4><code>400</code> - Missing or invalid query parameters</h4>
+<pre>{
+  error: {
+    message: string
+    provider?: "electricitymaps" | "neso" | "bmrs"
+  }
+}</pre>
+
+<h4><code>403</code> - NESO-only data requested from a non-UK origin</h4>
+<pre>{
+  error: {
+    message: string
+    provider?: "electricitymaps" | "neso" | "bmrs"
+  }
+}</pre>
+
+</section>
+
+<section>
+  <h3><code>GET /v2/zones</code></h3>
   <p>List Electricity Maps zones</p>
   
   <h4>Parameters</h4>
   <p><em>No parameters.</em></p>
   <h4>Responses</h4>
   <h4><code>200</code> - Electricity Maps' supported zone list, proxied so clients never need their own token. Falls back to the zones in CO2.js's annual dataset when there's no token or Electricity Maps is unreachable.</h4>
+<pre>{ [key: string]: {
+  zoneName?: string
+  countryName?: string
+} }</pre>
+
+</section>
+
+<section>
+  <h3><code>GET /v1/zones</code></h3>
+  <p>List Electricity Maps zones</p>
+  
+  <h4>Parameters</h4>
+  <p><em>No parameters.</em></p>
+  <h4>Responses</h4>
+  <h4><code>200</code> - Use /v2/zones.</h4>
 <pre>{ [key: string]: {
   zoneName?: string
   countryName?: string

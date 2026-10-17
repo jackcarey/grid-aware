@@ -17,7 +17,7 @@ export interface AppDeps {
   getColo(request: Request): string | undefined;
   /** True once GB regional traffic is high enough that one shared all-regions fetch beats one-off per-region calls. */
   isOverRegionalRateLimit(): Promise<boolean>;
-  /** True once total /v1/* traffic (any caller, any origin) exceeds the deployment's hard cap - blocks the request outright to protect the upstream quota. */
+  /** True once total /v1/* and /v2/* traffic (any caller, any origin) exceeds the deployment's hard cap - blocks the request outright to protect the upstream quota. */
   isOverApiRateLimit(): Promise<boolean>;
   cache: CacheStore;
 }

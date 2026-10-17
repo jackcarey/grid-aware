@@ -30,12 +30,17 @@ cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN and ALLOWED_OR
 npx wrangler dev
 ```
 
-`/v1/*` requests need a matching `Origin`/`Referer` header.
+`/v2/*` and `/v1/*` requests need a matching `Origin`/`Referer` header.
 
 `ELECTRICITY_MAPS_TOKEN` is optional. Without it, non-GB zones (and GB when NESO fails) are served
 from CO2.js's bundled annual averages, with `source: "co2js"` and a `fallback.reason`, and
-`/v1/zones` lists CO2.js's zones instead. Those figures are Electricity Maps data under ODbL, so
+`/v2/zones` lists CO2.js's zones instead. Those figures are Electricity Maps data under ODbL, so
 the `fallback.reason` text credits them.
+
+### API versions
+
+`/v2` is current. `/v1` is deprecated: it returns the same responses, with `Deprecation: true` and a
+`Link` header pointing to the `/v2` equivalent.
 
 ### Deploying
 
