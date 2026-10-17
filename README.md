@@ -55,11 +55,18 @@ minutes instead of `true` (e.g. `surplus=90`, max 2880) to size `suggested.windo
 | `derived.forecast[].windPercentageOfCapacity` | Average forecast wind output as a % of wind capacity ([NESO 14-day wind forecast](https://www.neso.energy/data-portal/14-days-ahead-wind-forecasts)). Transmission-connected wind only. |
 | `derived.forecast[].dayRank` | Rank for running deferrable compute, 1 being best. See [Day ranking](#day-ranking). |
 | `derived.regional.renewablePercentage` | Wind + solar + hydro share of the region's current mix. Regional requests only. |
-| `derived.suggested.window` | Lowest average intensity window in the next 48 hours that fits the job. Earliest wins a tie. |
-| `derived.suggested.day` | The day with `dayRank` 1. |
+| `derived.suggested.window` | Best time in the next 48 hours. See [Suggested times](#suggested-times). |
+| `derived.suggested.day` | Best day 2-14 days ahead. See [Suggested times](#suggested-times). |
 
 `derived` figures are calculated by grid-aware, not published by NESO or Elexon. BMRS and wind
 data are cached for an hour. If either source is down, the fields based on it are left out.
+
+#### Suggested times
+
+| Field | For jobs that can wait | Picks |
+| --- | --- | --- |
+| `window` | Up to 48 hours | Lowest average carbon intensity period that fits the job, from NESO's half-hourly forecast for the region (or GB). Earliest wins in there is a tie and `from` may be the current half-hour. |
+| `day` | 2-14 days | The day with `dayRank` 1. |
 
 #### Day ranking
 
