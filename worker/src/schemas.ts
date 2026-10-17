@@ -28,6 +28,107 @@ export const ForecastPointSchema = z
   })
   .openapi("ForecastPoint");
 
+export const SurplusSchema = z
+  .object({
+    bmrs: z
+      .object({
+        unit: z.literal("MW"),
+        publishTime: z.string().openapi({ description: "ISO 8601 UTC." }),
+        forecast: z
+          .array(
+            z.object({
+              date: z.string().openapi({ example: "2026-10-19", description: "UK local date." }),
+              surplus: z.number().openapi({
+                example: 6398,
+                description:
+                  "MW at the day's peak half hour.",
+              }),
+            }),
+          )
+          .openapi({ description: "2-14 days ahead." }),
+      })
+      .optional()
+      .openapi({
+        description:
+          "NESO's National Surplus Forecast from Elexon BMRS (OCNMFD). GB-wide. Omitted if BMRS is unavailable.",
+      }),
+    derived: z
+      .object({
+        forecast: z
+          .array(
+            z.object({
+              date: z.string().openapi({ example: "2026-10-19" }),
+              percentageOfDemand: z.number().optional().openapi({
+                example: 17.8,
+                description:
+                  "Surplus as a % of forecast national demand (BMRS NDFD). Absent when there's no demand forecast for the day.",
+              }),
+              dayRank: z.number().int().openapi({
+                example: 1,
+                description:
+                  "1 is the best day, by `percentageOfDemand` (raw MW if there's no demand forecast). Ties share a rank.",
+              }),
+            }),
+          )
+          .optional()
+          .openapi({ description: "One entry per `bmrs.forecast` day." }),
+        regional: z
+          .object({
+            renewablePercentage: z.number().openapi({
+              example: 62.5,
+              description: "Wind + solar + hydro share of the region's current mix, as a %.",
+            }),
+          })
+          .optional()
+          .openapi({
+            description:
+              "A proxy, not a measured surplus. Regional responses only.",
+          }),
+        suggested: z
+          .object({
+            window: z
+              .object({
+                from: z.string().openapi({
+                  description: "ISO 8601 UTC. May be the start of the current period.",
+                }),
+                to: z.string().openapi({ description: "ISO 8601 UTC." }),
+                averageIntensity: z.number().openapi({ example: 42 }),
+                unit: z.literal("gCO2eq/kWh"),
+              })
+              .optional()
+              .openapi({
+                description:
+                  "Lowest average intensity window in the next 48 hours that fits the job length from `surplus`. Earliest wins a tie.",
+              }),
+            day: z
+              .object({
+                date: z.string().openapi({ example: "2026-10-23" }),
+                surplus: z.number().openapi({ description: "MW." }),
+                percentageOfDemand: z.number().optional(),
+              })
+              .optional()
+              .openapi({
+                description:
+                  "Soonest day with `dayRank` 1.",
+              }),
+          })
+          .optional()
+          .openapi({
+            description:
+              "When to run deferrable compute.",
+          }),
+      })
+      .optional()
+      .openapi({
+        description:
+          "Calculated by grid-aware, not published by NESO or Elexon.",
+      }),
+  })
+  .openapi("Surplus", {
+    description:
+      "Present on NESO responses when `surplus=true`.",
+  });
+
 export const GridIntensityResponseSchema = z
   .object({
     source: z.enum(["electricitymaps", "neso", "co2js"]).openapi({
@@ -89,6 +190,7 @@ export const GridIntensityResponseSchema = z
         description:
           "Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is \"24h\" or \"48h\", and never for CO2.js fallbacks.",
       }),
+    surplus: SurplusSchema.optional(),
     fallback: z
       .object({
         reason: z.string(),
@@ -100,6 +202,11 @@ export const GridIntensityResponseSchema = z
       }),
   })
   .openapi("GridIntensityResponse");
+
+/** 1.x shape, kept for /v1. */
+export const GridIntensityResponseV1Schema = GridIntensityResponseSchema.omit({
+  surplus: true,
+}).openapi("GridIntensityResponseV1");
 
 export const ZoneListSchema = z
   .record(

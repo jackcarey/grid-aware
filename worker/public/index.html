@@ -33,6 +33,10 @@
   falling back to Electricity Maps' annual averages via <a href="https://www.thegreenwebfoundation.org/co2-js/">CO2.js</a> when live data is unavailable.
 </p>
 <p>
+  Add <code>surplus=true</code> to GB requests for NESO's surplus forecast from
+  <a href="https://bmrs.elexon.co.uk/surplus-forecast-and-margin">Elexon BMRS</a> and a suggested time to run compute.
+</p>
+<p>
   Read about the scope and caveats on the <a href="https://jackcarey.co.uk/projects/grid-aware/">project page</a> and <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> with questions or feedback.
 </p>
 
@@ -128,7 +132,8 @@
 <tr><td><code>postcode</code></td><td>query</td><td>no</td><td><code>string</code></td><td></td></tr>
 <tr><td><code>regionid</code></td><td>query</td><td>no</td><td><code>integer</code></td><td></td></tr>
 <tr><td><code>horizon</code></td><td>query</td><td>no</td><td><code>latest | 24h | 48h</code></td><td>latest</td></tr>
-<tr><td><code>source</code></td><td>query</td><td>no</td><td><code>auto | electricitymaps | neso</code></td><td>auto</td></tr></tbody>
+<tr><td><code>source</code></td><td>query</td><td>no</td><td><code>auto | electricitymaps | neso</code></td><td>auto</td></tr>
+<tr><td><code>surplus</code></td><td>query</td><td>no</td><td><code>string</code></td><td>false</td></tr></tbody>
 </table>
   <h4>Responses</h4>
   <h4><code>200</code> - Normalized grid carbon intensity for the requested location</h4>
@@ -166,6 +171,39 @@
       percentage: number
     }[]
   }[]
+  surplus?: {
+    bmrs?: {
+      unit: "MW"
+      publishTime: string
+      forecast: {
+        date: string
+        surplus: number
+      }[]
+    }
+    derived?: {
+      forecast?: {
+        date: string
+        percentageOfDemand?: number
+        dayRank: integer
+      }[]
+      regional?: {
+        renewablePercentage: number
+      }
+      suggested?: {
+        window?: {
+          from: string
+          to: string
+          averageIntensity: number
+          unit: "gCO2eq/kWh"
+        }
+        day?: {
+          date: string
+          surplus: number
+          percentageOfDemand?: number
+        }
+      }
+    }
+  }
   fallback?: {
     reason: string
   }
@@ -224,6 +262,115 @@
   fuel: string
   percentage: number
 }[]</pre></td><td>Fuel mix for this period. Only present for NESO regional forecasts.</td></tr>
+<tr><td><code>surplus</code></td><td><pre>{
+  bmrs?: {
+    unit: "MW"
+    publishTime: string
+    forecast: {
+      date: string
+      surplus: number
+    }[]
+  }
+  derived?: {
+    forecast?: {
+      date: string
+      percentageOfDemand?: number
+      dayRank: integer
+    }[]
+    regional?: {
+      renewablePercentage: number
+    }
+    suggested?: {
+      window?: {
+        from: string
+        to: string
+        averageIntensity: number
+        unit: "gCO2eq/kWh"
+      }
+      day?: {
+        date: string
+        surplus: number
+        percentageOfDemand?: number
+      }
+    }
+  }
+}</pre></td><td>Present on NESO responses when `surplus=true`.</td></tr>
+<tr><td><code>surplus.bmrs</code></td><td><pre>{
+  unit: "MW"
+  publishTime: string
+  forecast: {
+    date: string
+    surplus: number
+  }[]
+}</pre></td><td>NESO's National Surplus Forecast from Elexon BMRS (OCNMFD). GB-wide. Omitted if BMRS is unavailable.</td></tr>
+<tr><td><code>surplus.bmrs.publishTime</code></td><td><pre>string</pre></td><td>ISO 8601 UTC.</td></tr>
+<tr><td><code>surplus.bmrs.forecast</code></td><td><pre>{
+  date: string
+  surplus: number
+}[]</pre></td><td>2-14 days ahead.</td></tr>
+<tr><td><code>surplus.bmrs.forecast.date</code></td><td><pre>string</pre></td><td>UK local date.</td></tr>
+<tr><td><code>surplus.bmrs.forecast.surplus</code></td><td><pre>number</pre></td><td>MW at the day's peak half hour.</td></tr>
+<tr><td><code>surplus.derived</code></td><td><pre>{
+  forecast?: {
+    date: string
+    percentageOfDemand?: number
+    dayRank: integer
+  }[]
+  regional?: {
+    renewablePercentage: number
+  }
+  suggested?: {
+    window?: {
+      from: string
+      to: string
+      averageIntensity: number
+      unit: "gCO2eq/kWh"
+    }
+    day?: {
+      date: string
+      surplus: number
+      percentageOfDemand?: number
+    }
+  }
+}</pre></td><td>Calculated by grid-aware, not published by NESO or Elexon.</td></tr>
+<tr><td><code>surplus.derived.forecast</code></td><td><pre>{
+  date: string
+  percentageOfDemand?: number
+  dayRank: integer
+}[]</pre></td><td>One entry per `bmrs.forecast` day.</td></tr>
+<tr><td><code>surplus.derived.forecast.percentageOfDemand</code></td><td><pre>number</pre></td><td>Surplus as a % of forecast national demand (BMRS NDFD). Absent when there's no demand forecast for the day.</td></tr>
+<tr><td><code>surplus.derived.forecast.dayRank</code></td><td><pre>integer</pre></td><td>1 is the best day, by `percentageOfDemand` (raw MW if there's no demand forecast). Ties share a rank.</td></tr>
+<tr><td><code>surplus.derived.regional</code></td><td><pre>{
+  renewablePercentage: number
+}</pre></td><td>A proxy, not a measured surplus. Regional responses only.</td></tr>
+<tr><td><code>surplus.derived.regional.renewablePercentage</code></td><td><pre>number</pre></td><td>Wind + solar + hydro share of the region's current mix, as a %.</td></tr>
+<tr><td><code>surplus.derived.suggested</code></td><td><pre>{
+  window?: {
+    from: string
+    to: string
+    averageIntensity: number
+    unit: "gCO2eq/kWh"
+  }
+  day?: {
+    date: string
+    surplus: number
+    percentageOfDemand?: number
+  }
+}</pre></td><td>When to run deferrable compute.</td></tr>
+<tr><td><code>surplus.derived.suggested.window</code></td><td><pre>{
+  from: string
+  to: string
+  averageIntensity: number
+  unit: "gCO2eq/kWh"
+}</pre></td><td>Lowest average intensity window in the next 48 hours that fits the job length from `surplus`. Earliest wins a tie.</td></tr>
+<tr><td><code>surplus.derived.suggested.window.from</code></td><td><pre>string</pre></td><td>ISO 8601 UTC. May be the start of the current period.</td></tr>
+<tr><td><code>surplus.derived.suggested.window.to</code></td><td><pre>string</pre></td><td>ISO 8601 UTC.</td></tr>
+<tr><td><code>surplus.derived.suggested.day</code></td><td><pre>{
+  date: string
+  surplus: number
+  percentageOfDemand?: number
+}</pre></td><td>Soonest day with `dayRank` 1.</td></tr>
+<tr><td><code>surplus.derived.suggested.day.surplus</code></td><td><pre>number</pre></td><td>MW.</td></tr>
 <tr><td><code>fallback</code></td><td><pre>{
   reason: string
 }</pre></td><td>Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: "co2js"`), and only report `band`/`type` as "unknown" if the zone isn't in that dataset either.</td></tr></tbody>
@@ -260,7 +407,7 @@
 <tr><td><code>source</code></td><td>query</td><td>no</td><td><code>auto | electricitymaps | neso</code></td><td>auto</td></tr></tbody>
 </table>
   <h4>Responses</h4>
-  <h4><code>200</code> - Use /v2/intensity.</h4>
+  <h4><code>200</code> - 1.x response shape. Use /v2/intensity.</h4>
 <pre>{
   source: "electricitymaps" | "neso" | "co2js"
   location: {

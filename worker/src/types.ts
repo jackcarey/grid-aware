@@ -38,6 +38,54 @@ export interface ForecastPoint {
   generationMix?: GenerationMixEntry[];
 }
 
+export interface BmrsSurplusDay {
+  date: string;
+  surplus: number;
+}
+
+export interface BmrsSurplus {
+  unit: "MW";
+  publishTime: string;
+  forecast: BmrsSurplusDay[];
+}
+
+export interface DerivedSurplusDay {
+  date: string;
+  /** Absent when BMRS has no demand forecast for this date. */
+  percentageOfDemand?: number;
+  /** 1 = the best day in this forecast window. Tied days share a rank. */
+  dayRank: number;
+}
+
+export interface SuggestedWindow {
+  from: string;
+  to: string;
+  averageIntensity: number;
+  unit: "gCO2eq/kWh";
+}
+
+export interface SuggestedDay {
+  date: string;
+  surplus: number;
+  percentageOfDemand?: number;
+}
+
+export interface SuggestedCompute {
+  window?: SuggestedWindow;
+  day?: SuggestedDay;
+}
+
+export interface DerivedSurplus {
+  forecast?: DerivedSurplusDay[];
+  regional?: { renewablePercentage: number };
+  suggested?: SuggestedCompute;
+}
+
+export interface Surplus {
+  bmrs?: BmrsSurplus;
+  derived: DerivedSurplus;
+}
+
 export interface GridIntensityResponse {
   source: "electricitymaps" | "neso" | "co2js";
   location: RequestedLocation;
@@ -47,6 +95,8 @@ export interface GridIntensityResponse {
   generationMix?: GenerationMixEntry[];
   /** Absent for horizon=latest, which has no series to show. */
   forecast?: ForecastPoint[];
+  /** GB only: Electricity Maps and CO2.js responses never carry it. */
+  surplus?: Surplus;
   fallback?: Fallback;
 }
 

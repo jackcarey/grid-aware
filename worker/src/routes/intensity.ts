@@ -1,6 +1,7 @@
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import {
+  BMRS_CACHE_TTL_SECONDS,
   cachedJson,
   ELECTRICITY_MAPS_CACHE_TTL_SECONDS,
   NESO_CACHE_TTL_SECONDS,
@@ -14,12 +15,15 @@ import {
 } from "../errors.js";
 import { isUkRequest, toOutwardPostcode } from "../geo.js";
 import {
+  buildSurplus,
+  normalizeBmrsSurplus,
   normalizeElectricityMapsForecast,
   normalizeElectricityMapsLatest,
   normalizeNesoNational,
   normalizeNesoRegional,
 } from "../normalize.js";
 import type { AppEnv, CacheStore } from "../ports.js";
+import * as bmrs from "../providers/bmrs.js";
 import * as co2js from "../providers/co2js.js";
 import * as electricityMaps from "../providers/electricityMaps.js";
 import * as neso from "../providers/neso.js";
@@ -32,8 +36,11 @@ import {
 import {
   ErrorResponseSchema,
   GridIntensityResponseSchema,
+  GridIntensityResponseV1Schema,
 } from "../schemas.js";
 import type {
+  BmrsSurplus,
+  ForecastPoint,
   GridIntensityResponse,
   Horizon,
   RegionInfo,
@@ -53,9 +60,22 @@ const QuerySchema = z.object({
     .enum(["auto", "electricitymaps", "neso"])
     .optional()
     .default("auto"),
+  surplus: z
+    .union([z.enum(["true", "false"]), z.coerce.number().int().min(1).max(2880)])
+    .optional()
+    .default("false")
+    .openapi({
+      example: 90,
+      description:
+        "Adds `surplus` to GB (NESO) responses. Pass a job length in minutes (max 2880) to size `surplus.derived.suggested.window`, or \"true\" for 30.",
+    }),
 });
 
+const V1QuerySchema = QuerySchema.omit({ surplus: true });
+
 type IntensityQuery = z.infer<typeof QuerySchema>;
+
+const DEFAULT_JOB_MINUTES = 30;
 
 export type ResolvedTarget =
   | { kind: "neso-national" }
@@ -123,6 +143,55 @@ export function resolveIntensityTarget(params: {
   if (!zone)
     throw new BadRequestError("One of zone, postcode, or regionid is required");
   return { kind: "electricitymaps", zone };
+}
+
+interface BmrsData {
+  surplus: BmrsSurplus | undefined;
+  demand: bmrs.BmrsDemandDaily[];
+}
+
+/**
+ * Fetches BMRS's surplus and demand forecasts, shared by every GB caller. Raw data is cached, so
+ * changing our response shape never serves a stale one, and each dataset is cached separately so
+ * one outage doesn't block the other. Failures are swallowed: the intensity matters more.
+ */
+async function getBmrsData(cache: CacheStore, cacheKeyPrefix: string): Promise<BmrsData> {
+  const [surplus, demand] = await Promise.all([
+    cachedJson(`${cacheKeyPrefix}-ocnmfd`, BMRS_CACHE_TTL_SECONDS, cache, async () => {
+      const { data } = await bmrs.getDailySurplus();
+      // Throwing keeps an empty reply out of the cache.
+      if (!data.length) throw new UpstreamError("BMRS returned no surplus forecast", "bmrs");
+      return data;
+    }).catch(() => undefined),
+    cachedJson(`${cacheKeyPrefix}-ndfd`, BMRS_CACHE_TTL_SECONDS, cache, async () => (await bmrs.getDailyDemand()).data).catch(
+      () => undefined,
+    ),
+  ]);
+  return { surplus: surplus && normalizeBmrsSurplus(surplus), demand: demand ?? [] };
+}
+
+/** Adds the `surplus` field. */
+function withSurplus(
+  body: GridIntensityResponse,
+  data: BmrsData,
+  next48h: readonly ForecastPoint[] | undefined,
+  durationMinutes: number,
+): GridIntensityResponse {
+  const surplus = buildSurplus({
+    bmrs: data.surplus,
+    demand: data.demand,
+    regionalMix: body.generationMix,
+    next48h,
+    durationMinutes,
+  });
+  return surplus ? { ...body, surplus } : body;
+}
+
+/** Cache key part identifying which place a NESO target is about. */
+function nesoTargetKey(target: Exclude<ResolvedTarget, { kind: "electricitymaps" }>): string {
+  if (target.kind === "neso-national") return "national";
+  if (target.postcode) return `postcode=${toOutwardPostcode(target.postcode) ?? target.postcode}`;
+  return `regionid=${target.regionId}`;
 }
 
 /** Fetches and normalises the intensity for a resolved target. Throws on upstream failure. */
@@ -261,11 +330,11 @@ const route = createRoute({
 const v1Route = createRoute({
   method: "get",
   path: "/v1/intensity",
-  request: { query: QuerySchema },
+  request: { query: V1QuerySchema },
   responses: {
     200: {
-      content: { "application/json": { schema: GridIntensityResponseSchema } },
-      description: "Use /v2/intensity.",
+      content: { "application/json": { schema: GridIntensityResponseV1Schema } },
+      description: "1.x response shape. Use /v2/intensity.",
     },
     ...errorResponses,
   },
@@ -273,10 +342,13 @@ const v1Route = createRoute({
   deprecated: true,
 });
 
-/** Adds /v2/intensity, and the deprecated /v1/intensity. */
+/** Adds /v2/intensity, and /v1/intensity with its 1.x response shape. */
 export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
   app.openapi(route, async (c) => (await handleIntensity(c, c.req.valid("query"))) as never);
-  app.openapi(v1Route, async (c) => (await handleIntensity(c, c.req.valid("query"))) as never);
+  app.openapi(
+    v1Route,
+    async (c) => (await handleIntensity(c, { ...c.req.valid("query"), surplus: "false" })) as never,
+  );
 }
 
 /** Serves an intensity request. */
@@ -284,7 +356,7 @@ async function handleIntensity(
   c: Context<AppEnv>,
   query: IntensityQuery,
 ): Promise<Response> {
-  const { zone, postcode, regionid, horizon, source } = query;
+  const { zone, postcode, regionid, horizon, source, surplus } = query;
   const deps = c.get("deps");
   const country = deps.getCountry(c.req.raw);
   const isUk = isUkRequest(country);
@@ -334,6 +406,7 @@ async function handleIntensity(
       : NESO_CACHE_TTL_SECONDS;
   const origin = new URL(c.req.url).origin;
   const allRegionsCacheKey = `${origin}/__cache/neso-regional-all?horizon=${horizon}`;
+  const bmrsCacheKeyPrefix = `${origin}/__cache/bmrs`;
 
   let response: Response;
   try {
@@ -342,15 +415,35 @@ async function handleIntensity(
       cacheTtlSeconds,
       deps.cache,
       async () => {
-        const body = await resolveResponse(
-          target,
-          horizon,
-          deps.electricityMapsToken,
-          detectedNation,
-          deps.cache,
-          allRegionsCacheKey,
-          deps.isOverRegionalRateLimit,
-        );
+        const wantsSurplus = surplus !== "false" && target.kind !== "electricitymaps";
+        const jobMinutes = typeof surplus === "number" ? surplus : DEFAULT_JOB_MINUTES;
+        const resolve = (h: Horizon) =>
+          resolveResponse(
+            target,
+            h,
+            deps.electricityMapsToken,
+            detectedNation,
+            deps.cache,
+            allRegionsCacheKey,
+            deps.isOverRegionalRateLimit,
+          );
+        // Started before the intensity call so the upstreams run in parallel.
+        const bmrsData = wantsSurplus ? getBmrsData(deps.cache, bmrsCacheKeyPrefix) : undefined;
+        // The suggested window needs the next 48 hours, which a 48h request fetches anyway.
+        const next48h =
+          wantsSurplus && horizon !== "48h"
+            ? cachedJson(
+                `${origin}/__cache/neso-48h?${nesoTargetKey(target)}`,
+                NESO_CACHE_TTL_SECONDS,
+                deps.cache,
+                async () => (await resolve("48h")).forecast ?? [],
+              ).catch(() => undefined)
+            : undefined;
+        let body = await resolve(horizon);
+        if (bmrsData) {
+          const forecast48h = horizon === "48h" ? body.forecast : await next48h;
+          body = withSurplus(body, await bmrsData, forecast48h, jobMinutes);
+        }
         return c.json(body, 200);
       },
     );

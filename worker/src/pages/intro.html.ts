@@ -6,6 +6,10 @@ export const introHtml = `<h1>grid-aware</h1>
   falling back to Electricity Maps' annual averages via <a href="https://www.thegreenwebfoundation.org/co2-js/">CO2.js</a> when live data is unavailable.
 </p>
 <p>
+  Add <code>surplus=true</code> to GB requests for NESO's surplus forecast from
+  <a href="https://bmrs.elexon.co.uk/surplus-forecast-and-margin">Elexon BMRS</a> and a suggested time to run compute.
+</p>
+<p>
   Read about the scope and caveats on the <a href="https://jackcarey.co.uk/projects/grid-aware/">project page</a> and <a href="https://jackcarey.co.uk/contact/?subject=grid-aware">get in touch</a> with questions or feedback.
 </p>
 

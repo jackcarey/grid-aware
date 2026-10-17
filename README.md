@@ -39,8 +39,25 @@ the `fallback.reason` text credits them.
 
 ### API versions
 
-`/v2` is current. `/v1` is deprecated: it returns the same responses, with `Deprecation: true` and a
-`Link` header pointing to the `/v2` equivalent.
+`/v2` is current. `/v1` returns the 1.x response shapes (no `surplus`), with `Deprecation: true`
+and a `Link` header pointing to the `/v2` equivalent.
+
+### Surplus (GB only)
+
+`/v2/intensity?surplus=true` adds a `surplus` object to NESO responses. Pass a job length in
+minutes instead of `true` (e.g. `surplus=90`, max 2880) to size `suggested.window`; `true` means 30.
+
+| Field | |
+| --- | --- |
+| `bmrs.forecast[]` | NESO's National Surplus Forecast ([BMRS](https://bmrs.elexon.co.uk/surplus-forecast-and-margin) OCNMFD): MW at each day's peak half hour, 2-14 days ahead. GB-wide. |
+| `derived.forecast[].percentageOfDemand` | Surplus as a % of forecast national demand (BMRS NDFD). |
+| `derived.forecast[].dayRank` | 1 is the best day, by `percentageOfDemand` (raw MW if there's no demand forecast). Ties share a rank. |
+| `derived.regional.renewablePercentage` | Wind + solar + hydro share of the region's current mix. Regional requests only. |
+| `derived.suggested.window` | Lowest average intensity window in the next 48 hours that fits the job. Earliest wins a tie. |
+| `derived.suggested.day` | Soonest day with `dayRank` 1. |
+
+`derived` figures are calculated by grid-aware, not published by NESO or Elexon. BMRS data is
+cached for an hour. If BMRS is down, the BMRS-based fields are left out.
 
 ### Deploying
 
