@@ -8,6 +8,13 @@ export const NESO_ATTRIBUTION: Attribution = {
   url: "https://carbonintensity.org.uk",
 };
 
+export const NESO_DATA_PORTAL_ATTRIBUTION: Attribution = {
+  source: "neso-data-portal",
+  text: "Wind forecast from NESO. Supported by National Energy SO Open Data.",
+  licence: "https://www.neso.energy/data-portal/neso-open-licence",
+  url: "https://www.neso.energy/data-portal/14-days-ahead-wind-forecasts",
+};
+
 export const ELECTRICITY_MAPS_ATTRIBUTION: Attribution = {
   source: "electricitymaps",
   text: "Source: ElectricityMaps.com. Normalised by grid-aware.",
@@ -43,5 +50,8 @@ export function bmrsAttribution(publishTime: string): Attribution {
 export function withAttribution(body: IntensityBody): GridIntensityResponse {
   const attribution = body.carbonIntensity.type === "unknown" ? [] : [BY_SOURCE[body.source]];
   if (body.surplus?.bmrs) attribution.push(bmrsAttribution(body.surplus.bmrs.publishTime));
+  if (body.surplus?.derived.forecast?.some((d) => d.windPercentageOfCapacity !== undefined)) {
+    attribution.push(NESO_DATA_PORTAL_ATTRIBUTION);
+  }
   return { ...body, attribution };
 }

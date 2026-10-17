@@ -6,6 +6,7 @@ import {
   cachedJson,
   ELECTRICITY_MAPS_CACHE_TTL_SECONDS,
   NESO_CACHE_TTL_SECONDS,
+  NESO_WIND_CACHE_TTL_SECONDS,
   withEdgeCache,
 } from "../cache.js";
 import {
@@ -28,6 +29,7 @@ import * as bmrs from "../providers/bmrs.js";
 import * as co2js from "../providers/co2js.js";
 import * as electricityMaps from "../providers/electricityMaps.js";
 import * as neso from "../providers/neso.js";
+import * as nesoDataPortal from "../providers/nesoDataPortal.js";
 import {
   cityForColo,
   nationFromRegionName,
@@ -146,18 +148,19 @@ export function resolveIntensityTarget(params: {
   return { kind: "electricitymaps", zone };
 }
 
-interface BmrsData {
+interface DayData {
   surplus: BmrsSurplus | undefined;
   demand: bmrs.BmrsDemandDaily[];
+  wind: nesoDataPortal.NesoDailyWind[];
 }
 
 /**
- * Fetches BMRS's surplus and demand forecasts, shared by every GB caller. Raw data is cached, so
- * changing our response shape never serves a stale one, and each dataset is cached separately so
- * one outage doesn't block the other. Failures are swallowed: the intensity matters more.
+ * Fetches the 2-14 day surplus, demand and wind forecasts, shared by every GB caller. Raw data is
+ * cached, so changing our response shape never serves a stale one, and each dataset is cached
+ * separately so one outage doesn't block the others. Failures are swallowed: the intensity matters more.
  */
-async function getBmrsData(cache: CacheStore, cacheKeyPrefix: string): Promise<BmrsData> {
-  const [surplus, demand] = await Promise.all([
+async function getDayData(cache: CacheStore, cacheKeyPrefix: string): Promise<DayData> {
+  const [surplus, demand, wind] = await Promise.all([
     cachedJson(`${cacheKeyPrefix}-ocnmfd`, BMRS_CACHE_TTL_SECONDS, cache, async () => {
       const { data } = await bmrs.getDailySurplus();
       // Throwing keeps an empty reply out of the cache.
@@ -167,20 +170,24 @@ async function getBmrsData(cache: CacheStore, cacheKeyPrefix: string): Promise<B
     cachedJson(`${cacheKeyPrefix}-ndfd`, BMRS_CACHE_TTL_SECONDS, cache, async () => (await bmrs.getDailyDemand()).data).catch(
       () => undefined,
     ),
+    cachedJson(`${cacheKeyPrefix}-wind-14d`, NESO_WIND_CACHE_TTL_SECONDS, cache, nesoDataPortal.getDailyWind).catch(
+      () => undefined,
+    ),
   ]);
-  return { surplus: surplus && normalizeBmrsSurplus(surplus), demand: demand ?? [] };
+  return { surplus: surplus && normalizeBmrsSurplus(surplus), demand: demand ?? [], wind: wind ?? [] };
 }
 
 /** Adds the `surplus` field. */
 function withSurplus(
   body: IntensityBody,
-  data: BmrsData,
+  data: DayData,
   next48h: readonly ForecastPoint[] | undefined,
   durationMinutes: number,
 ): IntensityBody {
   const surplus = buildSurplus({
     bmrs: data.surplus,
     demand: data.demand,
+    wind: data.wind,
     regionalMix: body.generationMix,
     next48h,
     durationMinutes,
@@ -409,7 +416,7 @@ async function handleIntensity(
       : NESO_CACHE_TTL_SECONDS;
   const origin = new URL(c.req.url).origin;
   const allRegionsCacheKey = `${origin}/__cache/neso-regional-all?horizon=${horizon}`;
-  const bmrsCacheKeyPrefix = `${origin}/__cache/bmrs`;
+  const dayDataCacheKeyPrefix = `${origin}/__cache/day`;
 
   let response: Response;
   try {
@@ -431,7 +438,7 @@ async function handleIntensity(
             deps.isOverRegionalRateLimit,
           );
         // Started before the intensity call so the upstreams run in parallel.
-        const bmrsData = wantsSurplus ? getBmrsData(deps.cache, bmrsCacheKeyPrefix) : undefined;
+        const dayData = wantsSurplus ? getDayData(deps.cache, dayDataCacheKeyPrefix) : undefined;
         // The suggested window needs the next 48 hours, which a 48h request fetches anyway.
         const next48h =
           wantsSurplus && horizon !== "48h"
@@ -443,9 +450,9 @@ async function handleIntensity(
               ).catch(() => undefined)
             : undefined;
         let body = await resolve(horizon);
-        if (bmrsData) {
+        if (dayData) {
           const forecast48h = horizon === "48h" ? body.forecast : await next48h;
-          body = withSurplus(body, await bmrsData, forecast48h, jobMinutes);
+          body = withSurplus(body, await dayData, forecast48h, jobMinutes);
         }
         return c.json(present(body), 200);
       },

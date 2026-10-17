@@ -52,13 +52,24 @@ minutes instead of `true` (e.g. `surplus=90`, max 2880) to size `suggested.windo
 | --- | --- |
 | `bmrs.forecast[]` | NESO's National Surplus Forecast ([BMRS](https://bmrs.elexon.co.uk/surplus-forecast-and-margin) OCNMFD): MW at each day's peak half hour, 2-14 days ahead. GB-wide. |
 | `derived.forecast[].percentageOfDemand` | Surplus as a % of forecast national demand (BMRS NDFD). |
-| `derived.forecast[].dayRank` | 1 is the best day, by `percentageOfDemand` (raw MW if there's no demand forecast). Ties share a rank. |
+| `derived.forecast[].windPercentageOfCapacity` | Average forecast wind output as a % of wind capacity ([NESO 14-day wind forecast](https://www.neso.energy/data-portal/14-days-ahead-wind-forecasts)). Transmission-connected wind only. |
+| `derived.forecast[].dayRank` | Rank for running deferrable compute, 1 being best. See [Day ranking](#day-ranking). |
 | `derived.regional.renewablePercentage` | Wind + solar + hydro share of the region's current mix. Regional requests only. |
 | `derived.suggested.window` | Lowest average intensity window in the next 48 hours that fits the job. Earliest wins a tie. |
-| `derived.suggested.day` | Soonest day with `dayRank` 1. |
+| `derived.suggested.day` | The day with `dayRank` 1. |
 
-`derived` figures are calculated by grid-aware, not published by NESO or Elexon. BMRS data is
-cached for an hour. If BMRS is down, the BMRS-based fields are left out.
+`derived` figures are calculated by grid-aware, not published by NESO or Elexon. BMRS and wind
+data are cached for an hour. If either source is down, the fields based on it are left out.
+
+#### Day ranking
+
+Days are ordered by:
+
+1. Spare capacity (`surplus` above 0) first, so extra load doesn't land on a tight grid.
+2. Wind share, as a stand-in for lower carbon, since there's no intensity forecast this far ahead.
+   Days within 5 points count as equal, as the forecast isn't that precise.
+3. `percentageOfDemand`, so the day with the most slack wins.
+4. The earlier date, so no two days share a rank.
 
 ### Attribution
 
@@ -70,6 +81,7 @@ used. Keep these with the data if you display or redistribute it.
 | `neso` | [NESO Carbon Intensity API](https://carbonintensity.org.uk) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [terms of use](https://github.com/carbon-intensity/terms/) |
 | `electricitymaps` | [Electricity Maps](https://electricitymaps.com) | [Terms of service](https://electricitymaps.com/terms-of-service) |
 | `co2js` | Electricity Maps annual averages via [CO2.js](https://www.thegreenwebfoundation.org/co2-js/) | [ODbL](https://opendatacommons.org/licenses/odbl/) |
+| `neso-data-portal` | [NESO 14-day wind forecast](https://www.neso.energy/data-portal/14-days-ahead-wind-forecasts) | [NESO Open Data Licence](https://www.neso.energy/data-portal/neso-open-licence) |
 | `bmrs` | [Elexon BMRS](https://bmrs.elexon.co.uk) | [BMRS data licence](https://www.elexon.co.uk/bsc/data/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/) |
 
 ### Deploying

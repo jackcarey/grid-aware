@@ -30,7 +30,7 @@ export const ForecastPointSchema = z
 
 export const AttributionSchema = z
   .object({
-    source: z.enum(["neso", "electricitymaps", "co2js", "bmrs"]),
+    source: z.enum(["neso", "neso-data-portal", "electricitymaps", "co2js", "bmrs"]),
     text: z.string().openapi({
       example: "Contains BMRS data © Elexon Limited copyright and database right 2026",
       description: "Credit required by the source's licence or terms.",
@@ -80,10 +80,15 @@ export const SurplusSchema = z
                 description:
                   "Surplus as a % of forecast national demand (BMRS NDFD). Absent when there's no demand forecast for the day.",
               }),
+              windPercentageOfCapacity: z.number().optional().openapi({
+                example: 63.4,
+                description:
+                  "Average forecast wind output as a % of wind capacity (NESO 14-day wind forecast). Transmission-connected wind only. Absent for part-days.",
+              }),
               dayRank: z.number().int().openapi({
                 example: 1,
                 description:
-                  "1 is the best day, by `percentageOfDemand` (raw MW if there's no demand forecast). Ties share a rank.",
+                  "Rank for running deferrable compute, 1 being best. Days with spare capacity (`surplus` above 0) come first, so extra load doesn't land on a tight grid. Then wind share, as a stand-in for lower carbon this far ahead; days within 5 points count as equal, as the forecast isn't that precise. Then `percentageOfDemand` (raw MW if there's no demand forecast), so the most slack wins. Then the earlier date, so no two days share a rank.",
               }),
             }),
           )
@@ -122,11 +127,12 @@ export const SurplusSchema = z
                 date: z.string().openapi({ example: "2026-10-23" }),
                 surplus: z.number().openapi({ description: "MW." }),
                 percentageOfDemand: z.number().optional(),
+                windPercentageOfCapacity: z.number().optional(),
               })
               .optional()
               .openapi({
                 description:
-                  "Soonest day with `dayRank` 1.",
+                  "The day with `dayRank` 1.",
               }),
           })
           .optional()

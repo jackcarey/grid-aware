@@ -3,6 +3,7 @@ import { UpstreamError } from "./errors.js";
 import type { BmrsDemandDaily, BmrsSurplusDaily } from "./providers/bmrs.js";
 import type { ElectricityMapsForecast, ElectricityMapsLatest } from "./providers/electricityMaps.js";
 import type { NesoIntensityPeriod, NesoRegion, NesoRegionalPeriod } from "./providers/neso.js";
+import type { NesoDailyWind } from "./providers/nesoDataPortal.js";
 import type {
   BmrsSurplus,
   DerivedSurplusDay,
@@ -28,35 +29,67 @@ export function normalizeBmrsSurplus(surplus: readonly BmrsSurplusDaily[]): Bmrs
   };
 }
 
+/** Wind forecasts aren't precise enough for smaller gaps to mean a day is cleaner. */
+const WIND_GROUP_POINTS = 5;
+
 /**
  * Gives each day its surplus as a share of demand, since raw MW means different things in winter
- * and summer, and ranks the days by it (1 = best, ties share a rank). Raw MW is only ranked when no
- * day has a demand forecast, since mixing the two would favour whichever days happen to lack one.
+ * and summer, and its forecast wind share. Ranks days 1..n by:
+ * 1. a positive surplus, so the grid isn't tight;
+ * 2. wind, grouping days within WIND_GROUP_POINTS of the windiest day left;
+ * 3. the highest share of demand (raw MW if no day has a demand forecast, since mixing the two
+ *    would favour whichever days happen to lack one);
+ * 4. the soonest date.
  */
 export function deriveSurplusDays(
   bmrs: BmrsSurplus,
   demand: readonly BmrsDemandDaily[],
+  wind: readonly NesoDailyWind[] = [],
 ): DerivedSurplusDay[] {
   const demandByDate = new Map(demand.map((d) => [d.forecastDate, d.nationalDemand]));
-  const shares = bmrs.forecast.map((day) => {
+  const windByDate = new Map(wind.map((d) => [d.date, d.windPercentageOfCapacity]));
+  const days = bmrs.forecast.map((day) => {
     const dayDemand = demandByDate.get(day.date);
-    return typeof dayDemand === "number" && dayDemand > 0
-      ? Math.round((day.surplus / dayDemand) * 1000) / 10
-      : undefined;
-  });
-  const byShare = shares.some((share) => share !== undefined);
-  const scores = bmrs.forecast.map((day, i) =>
-    byShare ? (shares[i] ?? Number.NEGATIVE_INFINITY) : day.surplus,
-  );
-  return bmrs.forecast.map((day, i) => {
-    const share = shares[i];
-    const score = scores[i] ?? Number.NEGATIVE_INFINITY;
     return {
       date: day.date,
-      ...(share !== undefined && { percentageOfDemand: share }),
-      dayRank: 1 + scores.filter((other) => other > score).length,
+      surplus: day.surplus,
+      share: typeof dayDemand === "number" && dayDemand > 0
+        ? Math.round((day.surplus / dayDemand) * 1000) / 10
+        : undefined,
+      wind: windByDate.get(day.date),
+      windGroup: Number.POSITIVE_INFINITY,
     };
   });
+
+  let group = 0;
+  let groupTop = Number.POSITIVE_INFINITY;
+  const windy = days
+    .filter((d) => d.surplus > 0 && d.wind !== undefined)
+    .sort((a, b) => (b.wind ?? 0) - (a.wind ?? 0));
+  for (const day of windy) {
+    if ((day.wind ?? 0) < groupTop - WIND_GROUP_POINTS) {
+      group++;
+      groupTop = day.wind ?? 0;
+    }
+    day.windGroup = group;
+  }
+
+  const byShare = days.some((d) => d.share !== undefined);
+  const score = (d: (typeof days)[number]) => (byShare ? (d.share ?? Number.NEGATIVE_INFINITY) : d.surplus);
+  const ranked = [...days].sort(
+    (a, b) =>
+      Number(b.surplus > 0) - Number(a.surplus > 0) ||
+      (a.windGroup === b.windGroup ? 0 : a.windGroup < b.windGroup ? -1 : 1) ||
+      (score(a) === score(b) ? 0 : score(a) > score(b) ? -1 : 1) ||
+      a.date.localeCompare(b.date),
+  );
+
+  return days.map((day) => ({
+    date: day.date,
+    ...(day.share !== undefined && { percentageOfDemand: day.share }),
+    ...(day.wind !== undefined && { windPercentageOfCapacity: day.wind }),
+    dayRank: ranked.indexOf(day) + 1,
+  }));
 }
 
 const RENEWABLE_FUELS = new Set(["wind", "solar", "hydro"]);
@@ -99,24 +132,23 @@ export function bestWindow(
   };
 }
 
-/** The top-ranked day, taking the soonest when days tie. */
+/** The day ranked 1. */
 export function bestDay(bmrs: BmrsSurplus, days: readonly DerivedSurplusDay[]): SuggestedDay | undefined {
-  // YYYY-MM-DD dates sort as strings, so this holds whatever order BMRS lists days in.
-  const best = days
-    .filter((d) => d.dayRank === 1)
-    .reduce<DerivedSurplusDay | undefined>((soonest, d) => (!soonest || d.date < soonest.date ? d : soonest), undefined);
+  const best = days.find((d) => d.dayRank === 1);
   const day = best && bmrs.forecast.find((d) => d.date === best.date);
   if (!best || !day) return undefined;
   return {
     date: day.date,
     surplus: day.surplus,
     ...(best.percentageOfDemand !== undefined && { percentageOfDemand: best.percentageOfDemand }),
+    ...(best.windPercentageOfCapacity !== undefined && { windPercentageOfCapacity: best.windPercentageOfCapacity }),
   };
 }
 
 export interface SurplusInputs {
   bmrs?: BmrsSurplus;
   demand: readonly BmrsDemandDaily[];
+  wind?: readonly NesoDailyWind[];
   /** Only regional responses have a mix, so only they get the regional proxy. */
   regionalMix?: readonly GenerationMixEntry[];
   /** The next 48 hours of half-hourly intensity for the same place. */
@@ -126,8 +158,8 @@ export interface SurplusInputs {
 
 /** Assembles the `surplus` field. Returns undefined when there's nothing to report. */
 export function buildSurplus(input: SurplusInputs): Surplus | undefined {
-  const { bmrs, demand, regionalMix, next48h, durationMinutes } = input;
-  const forecast = bmrs && deriveSurplusDays(bmrs, demand);
+  const { bmrs, demand, wind, regionalMix, next48h, durationMinutes } = input;
+  const forecast = bmrs && deriveSurplusDays(bmrs, demand, wind);
   const window = next48h && bestWindow(next48h, durationMinutes);
   const day = bmrs && forecast && bestDay(bmrs, forecast);
   if (!bmrs && !regionalMix && !window) return undefined;

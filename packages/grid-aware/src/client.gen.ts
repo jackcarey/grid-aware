@@ -330,7 +330,12 @@ export interface components {
                      */
                     percentageOfDemand?: number;
                     /**
-                     * @description 1 is the best day, by `percentageOfDemand` (raw MW if there's no demand forecast). Ties share a rank.
+                     * @description Average forecast wind output as a % of wind capacity (NESO 14-day wind forecast). Transmission-connected wind only. Absent for part-days.
+                     * @example 63.4
+                     */
+                    windPercentageOfCapacity?: number;
+                    /**
+                     * @description Rank for running deferrable compute, 1 being best. Days with spare capacity (`surplus` above 0) come first, so extra load doesn't land on a tight grid. Then wind share, as a stand-in for lower carbon this far ahead; days within 5 points count as equal, as the forecast isn't that precise. Then `percentageOfDemand` (raw MW if there's no demand forecast), so the most slack wins. Then the earlier date, so no two days share a rank.
                      * @example 1
                      */
                     dayRank: number;
@@ -356,20 +361,21 @@ export interface components {
                         /** @enum {string} */
                         unit: "gCO2eq/kWh";
                     };
-                    /** @description Soonest day with `dayRank` 1. */
+                    /** @description The day with `dayRank` 1. */
                     day?: {
                         /** @example 2026-10-23 */
                         date: string;
                         /** @description MW. */
                         surplus: number;
                         percentageOfDemand?: number;
+                        windPercentageOfCapacity?: number;
                     };
                 };
             };
         };
         Attribution: {
             /** @enum {string} */
-            source: "neso" | "electricitymaps" | "co2js" | "bmrs";
+            source: "neso" | "neso-data-portal" | "electricitymaps" | "co2js" | "bmrs";
             /**
              * @description Credit required by the source's licence or terms.
              * @example Contains BMRS data © Elexon Limited copyright and database right 2026

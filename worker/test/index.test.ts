@@ -923,6 +923,14 @@ describe("app: /v2/intensity surplus", () => {
       if (url.includes("/forecast/demand/")) {
         return new Response(JSON.stringify(demand), { status: bmrsStatus });
       }
+      if (url.includes("api.neso.energy")) {
+        return new Response(
+          JSON.stringify({
+            result: { records: [{ date: "2026-01-03", mw: "12000", capacity: "24000", periods: "48" }] },
+          }),
+          { status: 200 },
+        );
+      }
       if (url.includes("electricitymap")) {
         return new Response(
           JSON.stringify({ zone: "FR", carbonIntensity: 10, datetime: "2026-01-01T00:00:00.000Z" }),
@@ -970,7 +978,7 @@ describe("app: /v2/intensity surplus", () => {
         headers: { Origin: ALLOWED_ORIGIN },
       });
       const body = (await res.json()) as Body;
-      expect(body.attribution.map((a) => a.source)).toEqual(["neso", "bmrs"]);
+      expect(body.attribution.map((a) => a.source)).toEqual(["neso", "bmrs", "neso-data-portal"]);
       expect(body.attribution[1]?.text).toMatch(/^Contains BMRS data © Elexon Limited/);
       expect(body.surplus?.bmrs?.forecast).toEqual([
         { date: "2026-01-03", surplus: 6000 },
@@ -978,13 +986,13 @@ describe("app: /v2/intensity surplus", () => {
       ]);
       expect(body.surplus?.derived).toEqual({
         forecast: [
-          { date: "2026-01-03", percentageOfDemand: 20, dayRank: 1 },
+          { date: "2026-01-03", percentageOfDemand: 20, windPercentageOfCapacity: 50, dayRank: 1 },
           { date: "2026-01-04", dayRank: 2 },
         ],
         regional: { renewablePercentage: 50 },
         suggested: {
           window: { from: "2026-01-01T01:30Z", to: "2026-01-01T02:00Z", averageIntensity: 30, unit: "gCO2eq/kWh" },
-          day: { date: "2026-01-03", surplus: 6000, percentageOfDemand: 20 },
+          day: { date: "2026-01-03", surplus: 6000, percentageOfDemand: 20, windPercentageOfCapacity: 50 },
         },
       });
     }

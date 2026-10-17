@@ -281,10 +281,73 @@ describe("deriveSurplusDays", () => {
     ]);
   });
 
-  it("ranks by raw MW when there's no demand forecast, with ties sharing a rank", () => {
-    const flat = { ...bmrs, forecast: [{ date: "2026-10-19", surplus: 5 }, { date: "2026-10-20", surplus: 5 }] };
-    expect(deriveSurplusDays(flat, []).map((d) => d.dayRank)).toEqual([1, 1]);
+  it("ranks by raw MW when there's no demand forecast, then by the soonest date", () => {
+    const flat = { ...bmrs, forecast: [{ date: "2026-10-20", surplus: 5 }, { date: "2026-10-19", surplus: 5 }] };
+    expect(deriveSurplusDays(flat, []).map((d) => d.dayRank)).toEqual([2, 1]);
     expect(deriveSurplusDays(bmrs, []).map((d) => d.dayRank)).toEqual([3, 2, 1]);
+  });
+
+  it("treats wind within 5 points of the windiest remaining day as level", () => {
+    const days = {
+      ...bmrs,
+      forecast: [
+        { date: "2026-10-23", surplus: 15000 },
+        { date: "2026-10-24", surplus: 15180 },
+        { date: "2026-10-25", surplus: 14430 },
+        { date: "2026-10-26", surplus: 10920 },
+        { date: "2026-10-27", surplus: 16000 },
+      ],
+    };
+    const wind = [
+      { date: "2026-10-23", windPercentageOfCapacity: 64.6 },
+      { date: "2026-10-24", windPercentageOfCapacity: 62.6 },
+      { date: "2026-10-25", windPercentageOfCapacity: 65 },
+      { date: "2026-10-26", windPercentageOfCapacity: 62.7 },
+      // Most slack, but well below the windiest group.
+      { date: "2026-10-27", windPercentageOfCapacity: 55.7 },
+    ];
+    const demands = ["2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27"].map((d) =>
+      demand(d, 30000),
+    );
+    expect(deriveSurplusDays(days, demands, wind).map((d) => [d.date, d.dayRank])).toEqual([
+      ["2026-10-23", 2],
+      ["2026-10-24", 1],
+      ["2026-10-25", 3],
+      ["2026-10-26", 4],
+      ["2026-10-27", 5],
+    ]);
+  });
+
+  it("ranks the windiest day with a positive surplus first, then share of demand", () => {
+    const days = {
+      ...bmrs,
+      forecast: [
+        { date: "2026-10-19", surplus: 9000 },
+        { date: "2026-10-20", surplus: 3000 },
+        { date: "2026-10-21", surplus: -500 },
+        { date: "2026-10-22", surplus: 6000 },
+      ],
+    };
+    const wind = [
+      { date: "2026-10-19", windPercentageOfCapacity: 30 },
+      { date: "2026-10-20", windPercentageOfCapacity: 60 },
+      // Windiest, but there's no spare capacity, so it ranks last.
+      { date: "2026-10-21", windPercentageOfCapacity: 80 },
+      { date: "2026-10-22", windPercentageOfCapacity: 60 },
+    ];
+    const demands = ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"].map((d) => demand(d, 30000));
+    expect(deriveSurplusDays(days, demands, wind).map((d) => [d.date, d.dayRank])).toEqual([
+      ["2026-10-19", 3],
+      ["2026-10-20", 2],
+      ["2026-10-21", 4],
+      ["2026-10-22", 1],
+    ]);
+    expect(deriveSurplusDays(days, demands, wind)[1]).toEqual({
+      date: "2026-10-20",
+      percentageOfDemand: 10,
+      windPercentageOfCapacity: 60,
+      dayRank: 2,
+    });
   });
 });
 
@@ -348,11 +411,11 @@ describe("bestDay", () => {
     expect(bestDay(bmrs, days)).toEqual({ date: "2026-10-19", surplus: 6000, percentageOfDemand: 30 });
   });
 
-  it("picks the soonest of tied top-ranked days, whatever order they arrive in", () => {
+  it("returns the day ranked 1, whatever order the days arrive in", () => {
     const days = [
       { date: "2026-10-20", dayRank: 1 },
-      { date: "2026-10-19", dayRank: 1 },
+      { date: "2026-10-19", dayRank: 2 },
     ];
-    expect(bestDay(bmrs, days)).toEqual({ date: "2026-10-19", surplus: 6000 });
+    expect(bestDay(bmrs, days)).toEqual({ date: "2026-10-20", surplus: 9000 });
   });
 });

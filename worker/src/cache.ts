@@ -9,6 +9,9 @@ export const ELECTRICITY_MAPS_CACHE_TTL_SECONDS = 60 * 60;
 /** NESO sends Elexon a new surplus forecast hourly. */
 export const BMRS_CACHE_TTL_SECONDS = 60 * 60;
 
+/** NESO refreshes the 14-day wind forecast hourly. */
+export const NESO_WIND_CACHE_TTL_SECONDS = 60 * 60;
+
 /** Returns the cached response for `cacheKey`, or runs `handler` and caches its result if it succeeded. */
 export async function withEdgeCache(
   cacheKey: string,

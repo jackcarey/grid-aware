@@ -29,6 +29,17 @@ describe("withAttribution", () => {
     expect(withAttribution(withBmrs).attribution.map((a) => a.source)).toEqual(["neso", "bmrs"]);
   });
 
+  it("adds NESO's open data credit when the wind forecast is used", () => {
+    const withWind: IntensityBody = {
+      ...body("neso"),
+      surplus: {
+        bmrs: { unit: "MW", publishTime: "2026-10-17T10:15:00Z", forecast: [] },
+        derived: { forecast: [{ date: "2026-10-19", windPercentageOfCapacity: 40, dayRank: 1 }] },
+      },
+    };
+    expect(withAttribution(withWind).attribution.map((a) => a.source)).toEqual(["neso", "bmrs", "neso-data-portal"]);
+  });
+
   it("credits no one when no data made it into the response", () => {
     expect(withAttribution(body("neso", "unknown")).attribution).toEqual([]);
   });

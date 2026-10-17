@@ -45,7 +45,7 @@ export interface BmrsSurplusDay {
   surplus: number;
 }
 
-export type SourceName = "neso" | "electricitymaps" | "co2js" | "bmrs";
+export type SourceName = "neso" | "neso-data-portal" | "electricitymaps" | "co2js" | "bmrs";
 
 export interface Attribution {
   source: SourceName;
@@ -64,7 +64,9 @@ export interface DerivedSurplusDay {
   date: string;
   /** Absent when BMRS has no demand forecast for this date. */
   percentageOfDemand?: number;
-  /** 1 = the best day in this forecast window. Tied days share a rank. */
+  /** Absent when NESO's wind forecast doesn't cover the whole day. */
+  windPercentageOfCapacity?: number;
+  /** 1 = the best day in this forecast window. */
   dayRank: number;
 }
 
@@ -79,6 +81,7 @@ export interface SuggestedDay {
   date: string;
   surplus: number;
   percentageOfDemand?: number;
+  windPercentageOfCapacity?: number;
 }
 
 export interface SuggestedCompute {
