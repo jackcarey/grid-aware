@@ -20,4 +20,5 @@ syncVersion("packages/grid-aware/package.json");
 syncVersion("packages/grid-aware/jsr.json");
 syncVersion("packages/cli/package.json");
 syncVersion("packages/cli/jsr.json");
+syncVersion("integrations/docker-plugin/package.json");
 syncVersion("integrations/gate/package.json");

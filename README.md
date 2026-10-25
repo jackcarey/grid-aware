@@ -16,6 +16,8 @@ _version numbers are synced across packages_
   client + `<script>`-tag widget consuming the worker's API.
 - [`packages/cli/`](packages/cli) - a `grid-aware` command that wraps the Green Web Foundation's
   [`grid-intensity`](https://developers.thegreenwebfoundation.org/grid-intensity-cli/commands/) CLI and adds GB DNO regions.
+- [`integrations/docker-plugin/`](integrations/docker-plugin) - a Drone-style CI plugin image that reports the best
+  time to start, and includes the gate.
 - [`integrations/gate/`](integrations/gate) - a shell script that runs deferrable work at the cleanest time
   before its deadline, using `/v2/suggest`. It never sleeps, so it suits cron and CI ticks.
 
@@ -181,7 +183,7 @@ under the scope and the same Trusted Publisher link). JSR gets the bundled `dist
 ## Versioning
 
 Root `package.json`'s `version` is the single source of truth for the whole repo. `npm run
-generate` (run in CI, and in the pre-commit hook) copies it into `apps/cloudflare-worker/package.json`, `packages/core/package.json`, `packages/grid-aware/package.json`, `packages/grid-aware/jsr.json`, `packages/cli/package.json`, `packages/cli/jsr.json` and `integrations/gate/package.json` via `scripts/sync-version.mjs`;
+generate` (run in CI, and in the pre-commit hook) copies it into `apps/cloudflare-worker/package.json`, `packages/core/package.json`, `packages/grid-aware/package.json`, `packages/grid-aware/jsr.json`, `packages/cli/package.json`, `packages/cli/jsr.json`, `integrations/docker-plugin/package.json` and `integrations/gate/package.json` via `scripts/sync-version.mjs`;
 the OpenAPI `info.version` in `packages/core/src/app.ts` reads `packages/core/package.json` directly. So bumping
 the version only means editing root `package.json` and committing the files the pre-commit hook
 regenerates. Pushing that to `main` makes CI's `release` job cut the matching git tag / GitHub

@@ -1,0 +1,10 @@
+{
+  "name": "grid-aware-docker-plugin",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "node --check src/plugin.mjs && node --check src/main.mjs",
+    "test": "node --test \"test/*.test.mjs\""
+  }
+}

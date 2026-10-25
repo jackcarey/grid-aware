@@ -1,0 +1,3 @@
+*
+!integrations/docker-plugin/src
+!integrations/gate/grid-aware-gate.sh
