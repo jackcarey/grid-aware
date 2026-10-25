@@ -23,6 +23,8 @@ _version numbers are synced across packages_
 - [`integrations/harness/`](integrations/harness) - a Harness step template that uses the Docker plugin.
 - [`integrations/gate/`](integrations/gate) - a shell script that runs deferrable work at the cleanest time
   before its deadline, using `/v2/suggest`. It never sleeps, so it suits cron and CI ticks.
+- [`examples/`](examples) - copy-and-adapt configs that use the gate, for Proxmox, GitHub Actions, GitLab CI,
+  Forgejo and Kubernetes; configs only, no code.
 
 ## Getting started
 

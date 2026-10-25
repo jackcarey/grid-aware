@@ -1,0 +1,26 @@
+# .forgejo/workflows/nightly.yml
+# Runs every 30 minutes. The build falls due daily at 01:00 UTC (an example) and runs at the best
+# time within GRID_AWARE_MAX_WAIT_MINUTES.
+#
+# Needs a runner you host: the gate remembers what it has run in a file, and Codeberg's shared
+# runners start empty. Install integrations/gate/grid-aware-gate.sh as
+# /usr/local/bin/grid-aware-gate, with /var/lib/grid-aware writable by the runner's user.
+name: Nightly build, gated on the grid
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: self-hosted
+    steps:
+      - name: Build when the gate opens
+        env:
+          GRID_AWARE_API_URL: https://your-grid-aware-api.example.com
+          GRID_AWARE_ORIGIN: https://codeberg.org/your-user
+          # London. postcode=SW1A also works.
+          GRID_AWARE_QUERY: regionid=13
+          GRID_AWARE_MAX_WAIT_MINUTES: "360"
+        run: grid-aware-gate run nightly-build --due 01:00 -- sh -c 'echo "heavy work goes here"'

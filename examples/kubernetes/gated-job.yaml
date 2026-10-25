@@ -1,0 +1,124 @@
+# Deferrable work on Kubernetes, with no pods while it waits.
+#
+# reindex-due creates the Job suspended and stamps it with the due time. reindex-tick starts it at
+# the best time before the deadline, or at the deadline. A suspended Job has no pods.
+#
+# Load the gate first:
+#   kubectl create configmap grid-aware-gate --from-file=integrations/gate/grid-aware-gate.sh
+#
+# The images need kubectl, curl and sh. alpine/k8s has them; pin a tag you have checked.
+# GRID_AWARE_ORIGIN must be in the API's ALLOWED_ORIGINS.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reindex-gate
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: reindex-gate
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: reindex-gate
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: reindex-gate }
+subjects:
+  - { kind: ServiceAccount, name: reindex-gate }
+---
+# The work, as a suspended Job.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reindex-job
+data:
+  job.yaml: |
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      generateName: reindex-
+      labels: { app: reindex }
+    spec:
+      suspend: true
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: reindex
+              image: your-registry/reindex:latest
+---
+# Marks the work due.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: reindex-due
+spec:
+  schedule: "0 1 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: reindex-gate
+          restartPolicy: OnFailure
+          containers:
+            - name: due
+              image: alpine/k8s:1.31.2
+              command:
+                - sh
+                - -c
+                - |
+                  job=$(kubectl create -f /template/job.yaml -o name)
+                  kubectl annotate "$job" gridaware-due="$(date +%s)"
+              volumeMounts:
+                - { name: template, mountPath: /template }
+          volumes:
+            - { name: template, configMap: { name: reindex-job } }
+---
+# Starts suspended Jobs whose time has come.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: reindex-tick
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: reindex-gate
+          restartPolicy: Never
+          containers:
+            - name: tick
+              image: alpine/k8s:1.31.2
+              env:
+                - { name: GRID_AWARE_API_URL, value: "https://your-grid-aware-api.example.com" }
+                - { name: GRID_AWARE_ORIGIN, value: "https://cluster.example.com" }
+                # London. postcode=SW1A also works.
+                - { name: GRID_AWARE_QUERY, value: "regionid=13" }
+                - { name: GRID_AWARE_MAX_WAIT_MINUTES, value: "360" }
+              command:
+                - sh
+                - -c
+                - |
+                  max=$(( GRID_AWARE_MAX_WAIT_MINUTES * 60 ))
+                  now=$(date +%s)
+                  kubectl get jobs -l app=reindex \
+                    -o jsonpath='{range .items[?(@.spec.suspend==true)]}{.metadata.name} {.metadata.annotations.gridaware-due}{"\n"}{end}' |
+                  while read -r job due; do
+                    [ -n "$job" ] && [ -n "$due" ] || continue
+                    left=$(( (max - (now - due) + 59) / 60 ))
+                    if [ $(( now - due )) -ge "$max" ] || GRID_AWARE_WITHIN_MINUTES="$left" sh /gate/grid-aware-gate.sh check; then
+                      kubectl patch job "$job" --type=merge -p '{"spec":{"suspend":false}}'
+                    fi
+                  done
+              volumeMounts:
+                - { name: gate, mountPath: /gate }
+          volumes:
+            - { name: gate, configMap: { name: grid-aware-gate } }
