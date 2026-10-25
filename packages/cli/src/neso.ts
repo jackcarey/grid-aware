@@ -1,4 +1,3 @@
-import { withAttribution } from "../../../worker/src/attribution.js";
 import { buildSurplus, normalizeNesoNational, normalizeNesoRegional } from "../../../worker/src/normalize.js";
 import {
   getNationalIntensity,
@@ -8,7 +7,21 @@ import {
   type NesoRegion,
   type NesoRegionalResponse,
 } from "../../../worker/src/providers/neso.js";
-import type { GridIntensityResponse } from "../../../worker/src/types.js";
+
+/** A record in the shape `grid-intensity` prints, so scripts can read every provider the same way. */
+export interface GwfRecord {
+  emissions_type: "average";
+  metric_type: "absolute";
+  provider: "NESO";
+  /** The region name, or GB for the national figure. */
+  location: string;
+  units: "gCO2e per kWh";
+  valid_from: string;
+  valid_to: string;
+  value: number;
+  /** True for forecasts, false for measured values. */
+  is_estimated: boolean;
+}
 
 /** Separate from upstream failures so the CLI can exit 2 for bad input and 1 for a failed request. */
 export class BadLocationError extends Error {}
@@ -53,20 +66,40 @@ async function findRegion(input: string, horizon: "latest" | "48h"): Promise<Nes
   return match;
 }
 
-/** Returns the same shape as the `/v2/intensity` API. `location` is GB, a region id (1-14), a region name or a postcode. */
-export async function queryNeso(location: string, { windowMinutes }: NesoOptions = {}): Promise<GridIntensityResponse> {
+/**
+ * `location` is GB, a region id (1-14), a region name or a postcode. Returns the current period, or
+ * with `windowMinutes` the best window instead, since `grid-intensity`'s shape has no field for both.
+ */
+export async function queryNeso(location: string, { windowMinutes }: NesoOptions = {}): Promise<GwfRecord[]> {
   // The window is chosen from the half-hourly forecast, which only the 48h request returns.
   const horizon = windowMinutes === undefined ? "latest" : "48h";
   const input = location.trim();
   const gb = { zone: "GB", region: { unknown: true } };
 
-  const { forecast, ...body } =
+  const body =
     input.toUpperCase() === "GB"
       ? normalizeNesoNational((await getNationalIntensity(horizon)).data, gb)
       : normalizeNesoRegional(await findRegion(input, horizon), gb);
-  if (windowMinutes === undefined) return withAttribution({ ...body, forecast });
+  const place = body.location.region.name ?? "GB";
+  const record = (from: string, to: string, value: number, estimated: boolean): GwfRecord => ({
+    emissions_type: "average",
+    metric_type: "absolute",
+    provider: "NESO",
+    location: place,
+    units: "gCO2e per kWh",
+    valid_from: from,
+    valid_to: to,
+    value,
+    is_estimated: estimated,
+  });
 
-  // The series was only needed to pick the window, so it isn't printed.
-  const surplus = buildSurplus({ demand: [], next48h: forecast, durationMinutes: windowMinutes });
-  return withAttribution(surplus ? { ...body, surplus } : body);
+  if (windowMinutes === undefined) {
+    const { value, type } = body.carbonIntensity;
+    if (value === null) throw new Error("NESO has no intensity for this period");
+    return [record(body.datetime, body.validTo ?? body.datetime, value, type !== "actual")];
+  }
+  const window = buildSurplus({ demand: [], next48h: body.forecast, durationMinutes: windowMinutes })?.derived
+    .suggested?.window;
+  if (!window) throw new Error("NESO's forecast is too short for a window that long");
+  return [record(window.from, window.to, window.averageIntensity, true)];
 }

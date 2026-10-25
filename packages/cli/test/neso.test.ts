@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BadLocationError, queryNeso } from "../src/neso.js";
 
-const region = (regionid: number, shortname: string) => ({
+const period = (from: string, forecast: number) => ({
+  from,
+  to: `${from}+30m`,
+  intensity: { forecast, index: "moderate" },
+  generationmix: [{ fuel: "wind", perc: 40 }],
+});
+
+const region = (regionid: number, shortname: string, periods = [period("a", 120)]) => ({
   regionid,
   dnoregion: `${shortname} DNO`,
   shortname,
-  data: [
-    {
-      from: "2026-10-25T10:00Z",
-      to: "2026-10-25T10:30Z",
-      intensity: { forecast: 120, index: "moderate" },
-      generationmix: [{ fuel: "wind", perc: 40 }],
-    },
-  ],
+  data: periods,
 });
 
 function mockFetch(handler: (url: string) => unknown) {
@@ -30,12 +30,22 @@ function mockFetch(handler: (url: string) => unknown) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("queryNeso", () => {
-  it("looks up a region by id", async () => {
+  it("returns a grid-intensity style record for a region id", async () => {
     const calls = mockFetch(() => ({ data: [region(13, "London")] }));
-    const body = await queryNeso("13");
+    expect(await queryNeso("13")).toEqual([
+      {
+        emissions_type: "average",
+        metric_type: "absolute",
+        provider: "NESO",
+        location: "London",
+        units: "gCO2e per kWh",
+        valid_from: "a",
+        valid_to: "a+30m",
+        value: 120,
+        is_estimated: true,
+      },
+    ]);
     expect(calls[0]).toContain("/regional/regionid/13");
-    expect(body.location.region.name).toBe("London");
-    expect(body.attribution).toHaveLength(1);
   });
 
   it("cuts a full postcode to its outward code", async () => {
@@ -45,35 +55,23 @@ describe("queryNeso", () => {
   });
 
   it("finds a region by name", async () => {
-    // The all-regions endpoint groups by period, with intensity on each region entry.
+    // The all-regions endpoint groups by period, with the region's intensity on each entry.
     const { data, ...rest } = region(13, "London");
-    const [period] = data;
-    mockFetch(() => ({
-      data: [{ from: "a", to: "b", regions: [{ ...rest, ...period }] }],
-    }));
-    const body = await queryNeso("london");
-    expect(body.location.region.id).toBe(13);
+    mockFetch(() => ({ data: [{ from: "a", to: "b", regions: [{ ...rest, ...data[0] }] }] }));
+    expect((await queryNeso("london"))[0]?.location).toBe("London");
   });
 
-  it("adds the best window from the 48h series when asked", async () => {
-    const period = (from: string, forecast: number) => ({
-      from,
-      to: from,
-      intensity: { forecast, index: "moderate" },
-      generationmix: [],
-    });
-    const { data, ...rest } = region(13, "London");
-    const calls = mockFetch(() => ({
-      data: {
-        ...rest,
-        data: [period("a", 200), period("b", 100), period("c", 50), period("d", 300)],
-      },
-    }));
-    const body = await queryNeso("13", { windowMinutes: 60 });
+  it("uses the best window from the 48h series when asked", async () => {
+    const periods = [period("a", 200), period("b", 100), period("c", 50), period("d", 300)];
+    const calls = mockFetch(() => ({ data: region(13, "London", periods) }));
+    const [record] = await queryNeso("13", { windowMinutes: 60 });
     expect(calls[0]).toContain("fw48h");
-    expect(body.forecast).toBeUndefined();
-    expect(body.surplus?.derived.suggested?.window).toMatchObject({ from: "b", averageIntensity: 75 });
-    expect(data).toBeDefined();
+    expect(record).toMatchObject({ valid_from: "b", valid_to: "c+30m", value: 75, is_estimated: true });
+  });
+
+  it("fails when the forecast is too short for the window", async () => {
+    mockFetch(() => ({ data: region(13, "London") }));
+    await expect(queryNeso("13", { windowMinutes: 120 })).rejects.toThrow(/too short/);
   });
 
   it("rejects out-of-range ids", async () => {

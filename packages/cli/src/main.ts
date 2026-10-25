@@ -1,3 +1,4 @@
+import { NESO_ATTRIBUTION } from "../../../worker/src/attribution.js";
 import { MAX_WINDOW_MINUTES, parseArgs } from "./args.js";
 import type { Config } from "./config.js";
 import type { ExecResult } from "./gwf.js";
@@ -51,7 +52,10 @@ export async function run(argv: readonly string[], deps: Deps): Promise<number> 
     return fail(`--window must be a whole number of minutes from 1 to ${MAX_WINDOW_MINUTES}.`, 2);
   }
   try {
-    deps.stdout(`${JSON.stringify(await deps.queryNeso(location, { windowMinutes: window }), null, 2)}\n`);
+    // Tab-indented like grid-intensity's own output.
+    deps.stdout(`${JSON.stringify(await deps.queryNeso(location, { windowMinutes: window }), null, "\t")}\n`);
+    // The CC BY licence requires the credit, and the output shape has nowhere to carry it.
+    deps.stderr(`${NESO_ATTRIBUTION.text}\n`);
     return 0;
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error), error instanceof BadLocationError ? 2 : 1);
