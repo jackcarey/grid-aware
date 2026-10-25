@@ -1,0 +1,12 @@
+{
+  "name": "@web-components/grid-aware-cli",
+  "version": "2.1.0",
+  "license": "MIT",
+  "exports": "./dist/cli.js",
+  "publish": {
+    "include": [
+      "dist/cli.js",
+      "README.md"
+    ]
+  }
+}

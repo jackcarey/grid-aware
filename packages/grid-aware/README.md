@@ -84,6 +84,21 @@ const forecast = await client.getForecast({ zone: "FR", horizon: "24h" }); // de
 Both return a`GridIntensityResponse` but `getForecast`'s response has its
 `forecast` array populated with one entry per period (30 minutes for NESO, 1 hour for Electricity Maps)
 
+## Suggested time to run a job
+
+For work that can wait (a build, a backup, a batch of video encodes), ask for the lowest-carbon
+time in the next 48 hours:
+
+```ts
+const window = await client.getSuggestedWindow({ regionid: 13, durationMinutes: 90 });
+// { from: "2026-10-25T18:30Z", to: "2026-10-25T20:00Z", averageIntensity: 51, unit: "gCO2eq/kWh" }
+```
+
+`durationMinutes` defaults to 30. It's GB only (NESO's forecast), so it returns `undefined` for other
+zones or if the forecast is unavailable. `from` can be the current half-hour, which means "now is
+the best time". The `SuggestedWindow` type is exported. The same data is on `surplus.derived.suggested.window`
+if you request `surplus` through `getCurrentIntensity`/`getForecast`.
+
 ## Regenerating the API client
 
 ```

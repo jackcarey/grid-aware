@@ -14,4 +14,6 @@ git add \
   packages/grid-aware/src/client.gen.ts \
   worker/package.json \
   packages/grid-aware/package.json \
-  packages/grid-aware/jsr.json
+  packages/grid-aware/jsr.json \
+  packages/cli/package.json \
+  packages/cli/jsr.json

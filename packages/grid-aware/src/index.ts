@@ -5,6 +5,7 @@ export {
   type GridAwareClient,
   type GridIntensityData,
   type IntensityQuery,
+  type SuggestedWindow,
 } from "./client.js";
 
 export interface GridAwareOptions {

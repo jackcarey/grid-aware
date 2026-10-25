@@ -11,6 +11,8 @@ _version numbers are synced across packages_
   with a thin Cloudflare-specific adapter in `src/platform/cloudflare.ts`.
 - [`packages/grid-aware/`](packages/grid-aware) - `@web-components/grid-aware` on JSR, a small
   client + `<script>`-tag widget consuming the worker's API.
+- [`packages/cli/`](packages/cli) - a `grid-aware` command that wraps the Green Web Foundation's
+  [`grid-intensity`](https://developers.thegreenwebfoundation.org/grid-intensity-cli/commands/) CLI and adds GB DNO regions.
 
 ## Getting started
 
@@ -77,6 +79,26 @@ Days are scored by:
 3. Higher `percentageOfDemand` (surplus as a % of forecast demand), since the same spare MW is more headroom on a quieter day. Raw MW is used if there's no demand forecast.
 4. The earlier date, so no two days share a rank and compute happens sooner.
 
+### CLI
+
+`packages/cli` builds a `grid-aware` command with the same shape as the Green Web Foundation's
+[`grid-intensity`](https://developers.thegreenwebfoundation.org/grid-intensity-cli/commands/)
+(`--provider`, `--location`, `provider list`, `exporter`). `--provider NESO` adds GB DNO regions;
+everything else is handed to the `grid-intensity` binary unchanged. The binary is downloaded and
+checked on first use, so there's nothing else to install.
+
+```
+deno run -A jsr:@web-components/grid-aware-cli --provider NESO --location 13
+npx jsr run @web-components/grid-aware-cli --provider NESO --location SW1A --window 90   # best time in the next 48h for a 90 minute job
+npx jsr run @web-components/grid-aware-cli --location PT                                # plain grid-intensity
+```
+
+See [`packages/cli/README.md`](packages/cli/README.md) for locations, defaults, exit codes and how to
+update the pinned `grid-intensity` version.
+
+For the same suggested window from the browser package, see
+[`getSuggestedWindow`](packages/grid-aware/README.md#suggested-time-to-run-a-job).
+
 ### Attribution
 
 Responses include an `attribution` array with the credit text and licence link for each source
@@ -106,7 +128,7 @@ declared. The same `routes` entry also changes what `wrangler dev` reports as th
 locally (it simulates the configured hostname), so local testing against `localhost` can behave
 differently once a custom domain is configured.
 
-### Publishing the browser package
+### Publishing the browser package and CLI
 
 Requires the `web-components` scope on jsr.io and that scope's GitHub repo linked as a Trusted
 Publisher. Publishing is automatic: bump the version in root `package.json` and push to `main` (see
@@ -118,15 +140,20 @@ cd packages/grid-aware
 npx jsr publish
 ```
 
+The CLI publishes the same way as `@web-components/grid-aware-cli` (it needs its own JSR package
+under the scope and the same Trusted Publisher link). JSR gets the bundled `dist/cli.js`, so run
+`npm run build:cli` before `npx jsr publish` in `packages/cli`.
+
 ## Versioning
 
 Root `package.json`'s `version` is the single source of truth for the whole repo. `npm run
 generate` (run in CI, and in the pre-commit hook) copies it into `worker/package.json`,
-`packages/grid-aware/package.json`, and `packages/grid-aware/jsr.json` via `scripts/sync-version.mjs`;
+`packages/grid-aware/package.json`, `packages/grid-aware/jsr.json`, `packages/cli/package.json` and
+`packages/cli/jsr.json` via `scripts/sync-version.mjs`;
 the OpenAPI `info.version` in `worker/src/app.ts` reads `worker/package.json` directly. So bumping
 the version only means editing root `package.json` and committing the files the pre-commit hook
 regenerates. Pushing that to `main` makes CI's `release` job cut the matching git tag / GitHub
-release automatically, which triggers the JSR publish.
+release automatically, which triggers the JSR publishes.
 
 ## License
 
