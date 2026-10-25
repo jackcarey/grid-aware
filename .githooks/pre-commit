@@ -17,4 +17,5 @@ git add \
   packages/grid-aware/package.json \
   packages/grid-aware/jsr.json \
   packages/cli/package.json \
-  packages/cli/jsr.json
+  packages/cli/jsr.json \
+  integrations/gate/package.json

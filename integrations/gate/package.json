@@ -1,0 +1,9 @@
+{
+  "name": "grid-aware-gate",
+  "version": "2.1.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "sh -n grid-aware-gate.sh && sh -n test.sh",
+    "test": "sh test.sh"
+  }
+}

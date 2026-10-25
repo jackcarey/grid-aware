@@ -17,7 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run generate
       - name: Fail if generated files are stale
-        run: git diff --exit-code -- packages/core/openapi.json apps/cloudflare-worker/public/index.html apps/cloudflare-worker/public/grid-aware/index.js packages/grid-aware/src/client.gen.ts apps/cloudflare-worker/package.json packages/core/package.json packages/grid-aware/package.json packages/grid-aware/jsr.json packages/cli/package.json packages/cli/jsr.json
+        run: git diff --exit-code -- packages/core/openapi.json apps/cloudflare-worker/public/index.html apps/cloudflare-worker/public/grid-aware/index.js packages/grid-aware/src/client.gen.ts apps/cloudflare-worker/package.json packages/core/package.json packages/grid-aware/package.json packages/grid-aware/jsr.json packages/cli/package.json packages/cli/jsr.json integrations/gate/package.json
       - run: npm run typecheck
       - run: npm run build:cli
 
