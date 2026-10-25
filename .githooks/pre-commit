@@ -19,4 +19,5 @@ git add \
   packages/cli/package.json \
   packages/cli/jsr.json \
   integrations/docker-plugin/package.json \
-  integrations/gate/package.json
+  integrations/gate/package.json \
+  integrations/jenkins/pom.xml

@@ -17,9 +17,21 @@ jobs:
       - run: npm ci
       - run: npm run generate
       - name: Fail if generated files are stale
-        run: git diff --exit-code -- packages/core/openapi.json apps/cloudflare-worker/public/index.html apps/cloudflare-worker/public/grid-aware/index.js packages/grid-aware/src/client.gen.ts apps/cloudflare-worker/package.json packages/core/package.json packages/grid-aware/package.json packages/grid-aware/jsr.json packages/cli/package.json packages/cli/jsr.json integrations/docker-plugin/package.json integrations/gate/package.json
+        run: git diff --exit-code -- packages/core/openapi.json apps/cloudflare-worker/public/index.html apps/cloudflare-worker/public/grid-aware/index.js packages/grid-aware/src/client.gen.ts apps/cloudflare-worker/package.json packages/core/package.json packages/grid-aware/package.json packages/grid-aware/jsr.json packages/cli/package.json packages/cli/jsr.json integrations/docker-plugin/package.json integrations/gate/package.json integrations/jenkins/pom.xml
       - run: npm run typecheck
       - run: npm run build:cli
+
+  jenkins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: mvn -B verify
+        working-directory: integrations/jenkins
 
   test:
     needs: build
@@ -85,3 +97,23 @@ jobs:
       - run: npm run build:cli
       - run: npx jsr publish
         working-directory: packages/cli
+
+  publish-jenkins:
+    needs: [build, test, jenkins, release]
+    if: always() && needs.build.result == 'success' && needs.test.result == 'success' && needs.jenkins.result == 'success' && needs.release.result == 'success' && needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      # An empty changelist drops -SNAPSHOT so the .hpi is named after the release.
+      - run: mvn -B -DskipTests -Dchangelist= package
+        working-directory: integrations/jenkins
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.release.outputs.tag }}" integrations/jenkins/target/grid-aware.hpi

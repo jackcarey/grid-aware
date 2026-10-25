@@ -1,0 +1,4 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core">
+  Holds builds in the queue while the electricity grid is carbon-intensive, using the grid-aware API.
+</j:jelly>

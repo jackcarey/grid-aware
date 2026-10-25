@@ -14,6 +14,15 @@ function syncVersion(relativePath) {
   console.log(`Updated ${relativePath} to ${version}`);
 }
 
+function syncPomRevision(relativePath) {
+  const path = `${rootDir}${relativePath}`;
+  const before = readFileSync(path, "utf8");
+  const after = before.replace(/<revision>[^<]*<\/revision>/, `<revision>${version}</revision>`);
+  if (after === before) return;
+  writeFileSync(path, after);
+  console.log(`Updated ${relativePath} to ${version}`);
+}
+
 syncVersion("apps/cloudflare-worker/package.json");
 syncVersion("packages/core/package.json");
 syncVersion("packages/grid-aware/package.json");
@@ -22,3 +31,4 @@ syncVersion("packages/cli/package.json");
 syncVersion("packages/cli/jsr.json");
 syncVersion("integrations/docker-plugin/package.json");
 syncVersion("integrations/gate/package.json");
+syncPomRevision("integrations/jenkins/pom.xml");

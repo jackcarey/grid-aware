@@ -1,0 +1,25 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:section title="Grid-aware builds">
+    <f:entry title="Opt out" field="optOut">
+      <f:checkbox/>
+    </f:entry>
+    <f:advanced>
+      <f:entry title="Good enough band" field="maxBand">
+        <f:select/>
+      </f:entry>
+      <f:entry title="Longest hold (minutes)" field="maxDelayMinutes">
+        <f:number min="0"/>
+      </f:entry>
+      <f:entry title="Zone" field="zone">
+        <f:textbox/>
+      </f:entry>
+      <f:entry title="UK postcode" field="postcode">
+        <f:textbox/>
+      </f:entry>
+      <f:entry title="UK region id" field="regionId">
+        <f:number min="1" max="14"/>
+      </f:entry>
+    </f:advanced>
+  </f:section>
+</j:jelly>

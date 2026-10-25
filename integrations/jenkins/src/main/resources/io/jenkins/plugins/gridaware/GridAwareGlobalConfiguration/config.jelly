@@ -1,0 +1,41 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+  <f:section title="Grid Aware">
+    <f:entry title="Hold builds" field="enabled">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="API URL" field="apiUrl">
+      <f:textbox/>
+    </f:entry>
+    <f:entry title="Origin" field="origin">
+      <f:textbox/>
+    </f:entry>
+    <f:entry title="Zone" field="zone">
+      <f:textbox/>
+    </f:entry>
+    <f:entry title="UK postcode" field="postcode">
+      <f:textbox/>
+    </f:entry>
+    <f:entry title="UK region id" field="regionId">
+      <f:number min="1" max="14"/>
+    </f:entry>
+    <f:entry title="Good enough band" field="maxBand">
+      <f:select/>
+    </f:entry>
+    <f:entry title="Longest hold (minutes)" field="maxDelayMinutes">
+      <f:number min="0" default="360"/>
+    </f:entry>
+    <f:entry title="Job length when unknown (minutes)" field="defaultJobMinutes">
+      <f:number min="1" default="30"/>
+    </f:entry>
+    <f:entry title="Let manually started builds through" field="manualBypass">
+      <f:checkbox default="true"/>
+    </f:entry>
+    <f:entry title="Most builds held at once" field="maxGatedItems">
+      <f:number min="0" default="0"/>
+    </f:entry>
+    <f:entry title="Dry run" field="dryRun">
+      <f:checkbox/>
+    </f:entry>
+  </f:section>
+</j:jelly>
