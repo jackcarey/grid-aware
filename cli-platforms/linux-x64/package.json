@@ -1,9 +1,0 @@
-{
-  "name": "grid-aware-cli-linux-x64",
-  "version": "2.0.0",
-  "description": "The Green Web Foundation grid-intensity binary for linux x64, used by grid-aware-cli.",
-  "license": "Apache-2.0",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "files": ["bin", "LICENSE"]
-}

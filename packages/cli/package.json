@@ -1,28 +1,12 @@
 {
   "name": "grid-aware-cli",
-  "version": "2.0.0",
-  "description": "grid-intensity with GB DNO regional data from NESO, and the Green Web Foundation binary bundled.",
-  "license": "MIT",
+  "version": "2.1.0",
+  "private": true,
   "type": "module",
-  "bin": {
-    "grid-aware": "dist/cli.js"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "fetch-gwf": "node scripts/fetch-gwf.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
-  },
-  "optionalDependencies": {
-    "grid-aware-cli-darwin-arm64": "2.0.0",
-    "grid-aware-cli-darwin-x64": "2.0.0",
-    "grid-aware-cli-linux-arm64": "2.0.0",
-    "grid-aware-cli-linux-x64": "2.0.0",
-    "grid-aware-cli-win32-arm64": "2.0.0",
-    "grid-aware-cli-win32-x64": "2.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
