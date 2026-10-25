@@ -104,4 +104,18 @@ export const introHtml = `<h1>grid-aware</h1>
 </p>
 <pre>&lt;script src="<span class="this-worker-url">https://your-deployed-url.com</span>/grid-aware/blocking.js"
         data-api-base-url="<span class="this-worker-url">https://your-deployed-url.com</span>"&gt;&lt;/script&gt;</pre>
+
+<h2>Schedule work for a cleaner time</h2>
+<p>
+  <code>/v2/suggest</code> returns when to start a job of a given length, as an ISO timestamp.
+  The <a href="https://github.com/jackcarey/grid-aware/tree/main/integrations">integrations</a> in
+  the repository use it to schedule work first and hold it until then, so nothing is skipped:
+</p>
+<ul>
+  <li><a href="https://github.com/jackcarey/grid-aware/tree/main/integrations/jenkins">Jenkins plugin</a></li>
+  <li><a href="https://github.com/jackcarey/grid-aware/tree/main/integrations/gate">Gate script</a> for cron and CI schedules</li>
+  <li><a href="https://github.com/jackcarey/grid-aware/tree/main/integrations/docker-plugin">Docker plugin</a>
+    and a <a href="https://github.com/jackcarey/grid-aware/tree/main/integrations/harness">Harness template</a></li>
+  <li><a href="https://github.com/jackcarey/grid-aware/tree/main/examples">Examples</a> for Proxmox, GitHub Actions, GitLab CI, Forgejo and Kubernetes</li>
+</ul>
 `;

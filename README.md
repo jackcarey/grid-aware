@@ -26,6 +26,27 @@ _version numbers are synced across packages_
 - [`examples/`](examples) - copy-and-adapt configs that use the gate, for Proxmox, GitHub Actions, GitLab CI,
   Forgejo and Kubernetes; configs only, no code.
 
+## How the integrations work
+
+Every integration schedules first, then gates. It asks [`/v2/suggest`](#v2suggest) when the best time to start is, holds the work until then, and always runs it by a deadline, the max wait. A dirty grid delays work; it never drops it. If the API can't be reached, the work runs.
+
+Where an integration can't hold work or remember that it ran, such as the [Docker plugin](integrations/docker-plugin) and [Harness](integrations/harness), it reports the schedule and leaves the decision to the pipeline.
+
+## Examples
+
+Configs for running deferrable work (nightly builds, scrubs, reindexing) at the cleanest time before a deadline. See the
+[examples index](examples) for how they work and their limits.
+
+| Platform | |
+|---|---|
+| Proxmox, Linux hosts | [`examples/proxmox`](examples/proxmox) |
+| GitHub Actions | [`examples/github-actions`](examples/github-actions) |
+| GitLab CI | [`examples/gitlab-ci`](examples/gitlab-ci) |
+| Forgejo, Codeberg | [`examples/forgejo-runner`](examples/forgejo-runner) |
+| Kubernetes | [`examples/kubernetes`](examples/kubernetes) |
+
+Jenkins and Harness have their own packages under [`integrations/`](integrations).
+
 ## Getting started
 
 ```
