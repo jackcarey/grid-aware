@@ -88,6 +88,32 @@ describe("createGridAwareClient", () => {
     expect(fetchStub.requestedUrl().searchParams.get("horizon")).toBe("48h");
   });
 
+  it("getSuggestedWindow asks for surplus sized to the job and returns the window", async () => {
+    const window = {
+      from: "2026-01-01T02:00:00.000Z",
+      to: "2026-01-01T03:30:00.000Z",
+      averageIntensity: 42,
+      unit: "gCO2eq/kWh",
+    };
+    const fetchStub = stubFetch({ ...CURRENT, surplus: { derived: { suggested: { window } } } });
+    const client = createGridAwareClient("https://example.com");
+
+    const result = await client.getSuggestedWindow({ regionid: 13, durationMinutes: 90 });
+
+    expect(result).toEqual(window);
+    expect(fetchStub.requestedUrl().searchParams.get("surplus")).toBe("90");
+    expect(fetchStub.requestedUrl().searchParams.get("horizon")).toBe("latest");
+    expect(fetchStub.requestedUrl().searchParams.get("regionid")).toBe("13");
+  });
+
+  it("getSuggestedWindow defaults the job length and is undefined without a surplus", async () => {
+    const fetchStub = stubFetch(CURRENT);
+    const client = createGridAwareClient("https://example.com");
+
+    expect(await client.getSuggestedWindow({ zone: "FR" })).toBeUndefined();
+    expect(fetchStub.requestedUrl().searchParams.get("surplus")).toBe("true");
+  });
+
   it("throws when the API responds with an error", async () => {
     vi.stubGlobal(
       "fetch",

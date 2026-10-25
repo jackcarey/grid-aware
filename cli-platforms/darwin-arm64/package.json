@@ -1,0 +1,9 @@
+{
+  "name": "grid-aware-cli-darwin-arm64",
+  "version": "2.0.0",
+  "description": "The Green Web Foundation grid-intensity binary for darwin arm64, used by grid-aware-cli.",
+  "license": "Apache-2.0",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "files": ["bin", "LICENSE"]
+}
