@@ -39,7 +39,6 @@ import {
 import {
   ErrorResponseSchema,
   GridIntensityResponseSchema,
-  GridIntensityResponseV1Schema,
 } from "../schemas.js";
 import type {
   BmrsSurplus,
@@ -73,8 +72,6 @@ const QuerySchema = z.object({
         "Adds `surplus` to GB (NESO) responses. Pass a job length in minutes (max 2880) to size `surplus.derived.suggested.window`, or \"true\" for 30.",
     }),
 });
-
-const V1QuerySchema = QuerySchema.omit({ surplus: true });
 
 type IntensityQuery = z.infer<typeof QuerySchema>;
 
@@ -335,32 +332,12 @@ const route = createRoute({
   ...routeDocs,
 });
 
-const v1Route = createRoute({
-  method: "get",
-  path: "/v1/intensity",
-  request: { query: V1QuerySchema },
-  responses: {
-    200: {
-      content: { "application/json": { schema: GridIntensityResponseV1Schema } },
-      description: "1.x response shape. Use /v2/intensity.",
-    },
-    ...errorResponses,
-  },
-  ...routeDocs,
-  deprecated: true,
-});
-
-/** Adds /v2/intensity, and /v1/intensity with its 1.x response shape. */
+/** Adds /v2/intensity. */
 export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
   app.openapi(route, async (c) => (await handleIntensity(c, c.req.valid("query"), withAttribution)) as never);
-  app.openapi(
-    v1Route,
-    async (c) =>
-      (await handleIntensity(c, { ...c.req.valid("query"), surplus: "false" }, (body) => body)) as never,
-  );
 }
 
-/** Serves an intensity request, shaping the body with `present` for the API version. */
+/** Serves an intensity request, shaping the body with `present`. */
 async function handleIntensity(
   c: Context<AppEnv>,
   query: IntensityQuery,

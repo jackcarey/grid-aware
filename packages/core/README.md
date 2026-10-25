@@ -8,7 +8,6 @@ The grid-aware API with no hosting assumptions. It is a [Hono](https://hono.dev)
 |---|---|
 | `GET /v2/intensity` | Current intensity, forecast and, for GB, suggested run times. |
 | `GET /v2/zones` | Supported zones. |
-| `GET /v1/intensity`, `/v1/zones` | Deprecated. Same data in the 1.x shape. |
 | `GET /openapi.json` | The OpenAPI spec. |
 
 Parameters and response shapes are in [`openapi.json`](openapi.json).
@@ -43,7 +42,7 @@ const response = await app.fetch(new Request("https://host/v2/intensity?zone=FR"
 | Field | |
 |---|---|
 | `electricityMapsToken` | Token, or `undefined` to use the fallback outside GB. |
-| `allowedOrigins` | Origins allowed to call `/v1/*` and `/v2/*`. |
+| `allowedOrigins` | Origins allowed to call `/v2/*`. |
 | `cache` | `get` and `set` with a TTL. `createInMemoryCacheStore()` is provided. |
 | `getCountry`, `getPostcode`, `getCity`, `getRegion`, `getColo` | Location of the caller, from the host's edge. Return `undefined` if unknown. |
 | `isOverRegionalRateLimit`, `isOverApiRateLimit` | Rate limit checks. |

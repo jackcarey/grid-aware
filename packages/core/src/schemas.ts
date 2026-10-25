@@ -227,12 +227,6 @@ export const GridIntensityResponseSchema = z
   })
   .openapi("GridIntensityResponse");
 
-/** 1.x shape, kept for /v1. */
-export const GridIntensityResponseV1Schema = GridIntensityResponseSchema.omit({
-  attribution: true,
-  surplus: true,
-}).openapi("GridIntensityResponseV1");
-
 const ZoneMapSchema = z.record(
   z.string(),
   z.object({
@@ -240,9 +234,6 @@ const ZoneMapSchema = z.record(
     countryName: z.string().optional(),
   }),
 );
-
-/** 1.x shape, kept for /v1. */
-export const ZoneListV1Schema = ZoneMapSchema.openapi("ZoneListV1");
 
 export const ZoneListSchema = z
   .object({

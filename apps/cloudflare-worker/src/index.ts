@@ -61,7 +61,7 @@ export async function isOverRegionalRateLimit(rateLimiter: RateLimit): Promise<b
   return !success;
 }
 
-const API_RATE_LIMIT_KEY = "v1-global";
+const API_RATE_LIMIT_KEY = "api-global";
 
 /** True once total API traffic is over the deployment's hard limit. */
 export async function isOverApiRateLimit(rateLimiter: RateLimit): Promise<boolean> {

@@ -15,7 +15,7 @@ The Cloudflare Worker that serves the grid-aware API. The API is [`packages/core
 | Name | Kind | |
 |---|---|---|
 | `ELECTRICITY_MAPS_TOKEN` | secret | Optional. Without it, non-GB zones use CO2.js annual averages. |
-| `ALLOWED_ORIGINS` | secret | Comma-separated origins allowed to call `/v1/*` and `/v2/*`. `https://*.example.com` matches subdomains but not `example.com`. |
+| `ALLOWED_ORIGINS` | secret | Comma-separated origins allowed to call `/v2/*`. `https://*.example.com` matches subdomains but not `example.com`. |
 | `GB_REGIONAL_RATE_LIMITER` | binding | 1 request per 60 seconds. Past it, GB regional requests share one all-regions fetch. |
 | `API_RATE_LIMITER` | binding | 100 requests per 60 seconds across all callers. Past it, requests are rejected. |
 | `ASSETS` | binding | Serves `public/`. |
@@ -27,7 +27,7 @@ cp .dev.vars.example .dev.vars    # fill in the two settings
 npm run dev
 ```
 
-Requests to `/v1/*` and `/v2/*` need an `Origin` or `Referer` in `ALLOWED_ORIGINS`.
+Requests to `/v2/*` need an `Origin` or `Referer` in `ALLOWED_ORIGINS`.
 
 ## Deploy
 

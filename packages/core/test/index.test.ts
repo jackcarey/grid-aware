@@ -33,19 +33,20 @@ describe("app: public routes", () => {
     const res = await app.request("/openapi.json");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { paths: Record<string, unknown> };
-    expect(body.paths["/v1/intensity"]).toBeDefined();
+    expect(body.paths["/v2/intensity"]).toBeDefined();
+    expect(Object.keys(body.paths).filter((p) => p.startsWith("/v1/"))).toEqual([]);
   });
 });
 
-describe("app: /v1/intensity allowlist", () => {
+describe("app: /v2/intensity allowlist", () => {
   it("rejects a request with no Origin/Referer", async () => {
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=GB");
+    const res = await app.request("/v2/intensity?zone=GB");
     expect(res.status).toBe(403);
   });
 });
 
-describe("app: /v1/intensity", () => {
+describe("app: /v2/intensity", () => {
   it("serves NESO national data for an allowed UK caller", async () => {
     vi.stubGlobal(
       "fetch",
@@ -67,7 +68,7 @@ describe("app: /v1/intensity", () => {
     );
 
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=GB", {
+    const res = await app.request("/v2/intensity?zone=GB", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -98,7 +99,7 @@ describe("app: /v1/intensity", () => {
     );
 
     const app = createApp(buildDeps({ getCountry: () => "US" }));
-    const res = await app.request("/v1/intensity?zone=GB", {
+    const res = await app.request("/v2/intensity?zone=GB", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -112,7 +113,7 @@ describe("app: /v1/intensity", () => {
 
   it("rejects a postcode request from a non-UK caller", async () => {
     const app = createApp(buildDeps({ getCountry: () => "US" }));
-    const res = await app.request("/v1/intensity?postcode=SW1A", {
+    const res = await app.request("/v2/intensity?postcode=SW1A", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(403);
@@ -120,7 +121,7 @@ describe("app: /v1/intensity", () => {
 
   it("returns 400 when no subject is given and the country can't be detected", async () => {
     const app = createApp(buildDeps({ getCountry: () => undefined }));
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(400);
@@ -143,7 +144,7 @@ describe("app: /v1/intensity", () => {
     );
 
     const app = createApp(buildDeps({ getCountry: () => "FR" }));
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -176,7 +177,7 @@ describe("app: /v1/intensity", () => {
     );
 
     const app = createApp(buildDeps({ getCountry: () => "GB" }));
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -215,7 +216,7 @@ describe("app: /v1/intensity", () => {
     const app = createApp(
       buildDeps({ getCountry: () => "GB", getPostcode: () => "SW1A" }),
     );
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -264,7 +265,7 @@ describe("app: /v1/intensity", () => {
         getCity: () => "Birmingham",
       }),
     );
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -304,7 +305,7 @@ describe("app: /v1/intensity", () => {
         getRegion: () => "Scotland",
       }),
     );
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -356,7 +357,7 @@ describe("app: /v1/intensity", () => {
         getColo: () => "MAN",
       }),
     );
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -417,7 +418,7 @@ describe("app: /v1/intensity", () => {
       buildDeps({ cache, isOverRegionalRateLimit }),
     );
 
-    const first = await manchester.request("/v1/intensity", {
+    const first = await manchester.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const firstBody = (await first.json()) as {
@@ -426,7 +427,7 @@ describe("app: /v1/intensity", () => {
     expect(firstBody.location.region?.name).toBe("North West England");
 
     // An explicit regionid is just as fungible for the shared fetch once rate-limited.
-    const second = await explicitLondon.request("/v1/intensity?regionid=8", {
+    const second = await explicitLondon.request("/v2/intensity?regionid=8", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const secondBody = (await second.json()) as {
@@ -465,10 +466,10 @@ describe("app: /v1/intensity", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const app = createApp(buildDeps());
-    await app.request("/v1/intensity?regionid=3", {
+    await app.request("/v2/intensity?regionid=3", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
-    await app.request("/v1/intensity?regionid=8", {
+    await app.request("/v2/intensity?regionid=8", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
 
@@ -504,7 +505,7 @@ describe("app: /v1/intensity", () => {
         getColo: () => "DFW",
       }),
     );
-    const res = await app.request("/v1/intensity", {
+    const res = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -541,7 +542,7 @@ describe("app: /v1/intensity", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const app = createApp(buildDeps({ getCountry: () => "GB" }));
-    const res = await app.request("/v1/intensity?postcode=SW1A%201AA", {
+    const res = await app.request("/v2/intensity?postcode=SW1A%201AA", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -569,7 +570,7 @@ describe("app: /v1/intensity", () => {
     const app = createApp(
       buildDeps({ getCountry: () => "GB", getPostcode: () => "SW1A" }),
     );
-    const res = await app.request("/v1/intensity?zone=FR", {
+    const res = await app.request("/v2/intensity?zone=FR", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -594,7 +595,7 @@ describe("app: /v1/intensity", () => {
     let country = "FR";
     const app = createApp(buildDeps({ getCountry: () => country }));
 
-    const first = await app.request("/v1/intensity", {
+    const first = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const firstBody = (await first.json()) as {
@@ -603,7 +604,7 @@ describe("app: /v1/intensity", () => {
     expect(firstBody.carbonIntensity.value).toBe(1);
 
     country = "DE";
-    const second = await app.request("/v1/intensity", {
+    const second = await app.request("/v2/intensity", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const secondBody = (await second.json()) as {
@@ -623,7 +624,7 @@ describe("app: /v1/intensity", () => {
     );
 
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=FR", {
+    const res = await app.request("/v2/intensity?zone=FR", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -638,7 +639,7 @@ describe("app: /v1/intensity", () => {
 
   it("serves CO2.js data when no token is configured", async () => {
     const app = createApp(buildDeps({ electricityMapsToken: undefined }));
-    const res = await app.request("/v1/intensity?zone=DE", {
+    const res = await app.request("/v2/intensity?zone=DE", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const body = (await res.json()) as { source: string; carbonIntensity: { value: number } };
@@ -650,7 +651,7 @@ describe("app: /v1/intensity", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
 
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=GB", {
+    const res = await app.request("/v2/intensity?zone=GB", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const body = (await res.json()) as { source: string; fallback?: { reason: string } };
@@ -675,7 +676,7 @@ describe("app: /v1/intensity", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const app = createApp(buildDeps());
-    const first = await app.request("/v1/intensity?zone=FR", {
+    const first = await app.request("/v2/intensity?zone=FR", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const firstBody = (await first.json()) as {
@@ -683,7 +684,7 @@ describe("app: /v1/intensity", () => {
     };
     expect(firstBody.carbonIntensity.band).toBe("low");
 
-    const second = await app.request("/v1/intensity?zone=FR", {
+    const second = await app.request("/v2/intensity?zone=FR", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     const secondBody = (await second.json()) as {
@@ -724,15 +725,15 @@ describe("app: /v1/intensity", () => {
       buildDeps({ getCountry: () => "GB", getPostcode: () => postcode }),
     );
 
-    await app.request("/v1/intensity", { headers: { Origin: ALLOWED_ORIGIN } });
+    await app.request("/v2/intensity", { headers: { Origin: ALLOWED_ORIGIN } });
     postcode = "RG41";
-    await app.request("/v1/intensity", { headers: { Origin: ALLOWED_ORIGIN } });
+    await app.request("/v2/intensity", { headers: { Origin: ALLOWED_ORIGIN } });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
-describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
+describe("app: /v2/intensity forecast (horizon=24h/48h)", () => {
   it("includes a forecast array of every NESO national period in the window", async () => {
     vi.stubGlobal(
       "fetch",
@@ -759,7 +760,7 @@ describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
     );
 
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=GB&horizon=24h", {
+    const res = await app.request("/v2/intensity?zone=GB&horizon=24h", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -807,7 +808,7 @@ describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
     );
 
     const app = createApp(buildDeps({ getCountry: () => "GB", getPostcode: () => "SW1A" }));
-    const res = await app.request("/v1/intensity?horizon=48h", {
+    const res = await app.request("/v2/intensity?horizon=48h", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -837,7 +838,7 @@ describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
     );
 
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=FR&horizon=24h", {
+    const res = await app.request("/v2/intensity?zone=FR&horizon=24h", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -869,7 +870,7 @@ describe("app: /v1/intensity forecast (horizon=24h/48h)", () => {
     );
 
     const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=GB", {
+    const res = await app.request("/v2/intensity?zone=GB", {
       headers: { Origin: ALLOWED_ORIGIN },
     });
     expect(res.status).toBe(200);
@@ -1112,57 +1113,5 @@ describe("app: /v2/zones", () => {
     };
     expect(body.zones.GB).toEqual({ zoneName: "Great Britain" });
     expect(body.attribution.map((a) => a.source)).toEqual(["co2js"]);
-  });
-});
-
-describe("app: /v1 keeps 1.x response shapes", () => {
-  const nesoNational = {
-    data: [
-      {
-        from: "2026-01-01T00:00Z",
-        to: "2026-01-01T00:30Z",
-        intensity: { actual: 100, forecast: 100, index: "moderate" },
-      },
-    ],
-  };
-
-  it("leaves out attribution and ignores surplus on /v1/intensity", async () => {
-    const fetchMock = vi.fn(async (_url: string | URL) => new Response(JSON.stringify(nesoNational), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=GB&surplus=true", {
-      headers: { Origin: ALLOWED_ORIGIN },
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.source).toBe("neso");
-    expect(body).not.toHaveProperty("attribution");
-    expect(body).not.toHaveProperty("surplus");
-    expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
-  });
-
-  it("returns the bare zone map on /v1/zones", async () => {
-    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
-    const res = await app.request("/v1/zones", { headers: { Origin: ALLOWED_ORIGIN } });
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.GB).toEqual({ zoneName: "Great Britain" });
-    expect(body).not.toHaveProperty("zones");
-  });
-
-  it("points /v1 callers at the same request on /v2", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(nesoNational), { status: 200 })));
-    const app = createApp(buildDeps());
-    const res = await app.request("/v1/intensity?zone=GB&horizon=latest", {
-      headers: { Origin: ALLOWED_ORIGIN },
-    });
-    expect(res.headers.get("Deprecation")).toBe("true");
-    expect(res.headers.get("Link")).toBe('</v2/intensity?zone=GB&horizon=latest>; rel="successor-version"');
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
-  });
-
-  it("doesn't mark /v2 as deprecated", async () => {
-    const app = createApp(buildDeps({ electricityMapsToken: undefined }));
-    const res = await app.request("/v2/zones", { headers: { Origin: ALLOWED_ORIGIN } });
-    expect(res.headers.get("Deprecation")).toBeNull();
   });
 });

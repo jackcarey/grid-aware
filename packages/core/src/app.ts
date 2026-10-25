@@ -33,18 +33,8 @@ export function createApp(deps: AppDeps): OpenAPIHono<AppEnv> {
     },
   });
 
-  // /v1 keeps its 1.x response shapes; point callers at the same request on /v2.
-  app.use("/v1/*", async (c, next) => {
-    await next();
-    const { pathname, search } = new URL(c.req.url);
-    c.res = new Response(c.res.body, c.res);
-    c.res.headers.set("Deprecation", "true");
-    c.res.headers.set("Link", `<${pathname.replace(/^\/v1\//, "/v2/")}${search}>; rel="successor-version"`);
-  });
-  for (const path of ["/v1/*", "/v2/*"]) {
-    app.use(path, createAllowlistMiddleware(deps.allowedOrigins));
-    app.use(path, createRateLimitMiddleware());
-  }
+  app.use("/v2/*", createAllowlistMiddleware(deps.allowedOrigins));
+  app.use("/v2/*", createRateLimitMiddleware());
   registerIntensityRoute(app);
   registerZonesRoute(app);
 

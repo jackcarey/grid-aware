@@ -4,7 +4,7 @@ import { CO2JS_ATTRIBUTION, ELECTRICITY_MAPS_ATTRIBUTION } from "../attribution.
 import { cachedJson, ELECTRICITY_MAPS_CACHE_TTL_SECONDS } from "../cache.js";
 import * as co2js from "../providers/co2js.js";
 import * as electricityMaps from "../providers/electricityMaps.js";
-import { ZoneListSchema, ZoneListV1Schema } from "../schemas.js";
+import { ZoneListSchema } from "../schemas.js";
 import type { AppEnv } from "../ports.js";
 import type { ZoneListResponse } from "../types.js";
 
@@ -16,16 +16,6 @@ const route = createRoute({
   path: "/v2/zones",
   responses: { 200: { content: { "application/json": { schema: ZoneListSchema } }, description } },
   summary: "List Electricity Maps zones",
-});
-
-const v1Route = createRoute({
-  method: "get",
-  path: "/v1/zones",
-  responses: {
-    200: { content: { "application/json": { schema: ZoneListV1Schema } }, description: "1.x response shape. Use /v2/zones." },
-  },
-  summary: "List Electricity Maps zones",
-  deprecated: true,
 });
 
 /** The zone list from CO2.js, with its credit. */
@@ -46,8 +36,7 @@ async function getZones(c: Context<AppEnv>): Promise<ZoneListResponse> {
   ).catch(co2jsZones);
 }
 
-/** Adds /v2/zones, and /v1/zones with its 1.x response shape. */
+/** Adds /v2/zones. */
 export function registerZonesRoute(app: OpenAPIHono<AppEnv>): void {
   app.openapi(route, async (c) => c.json(await getZones(c), 200));
-  app.openapi(v1Route, async (c) => c.json((await getZones(c)).zones, 200));
 }

@@ -67,71 +67,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/intensity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get combined grid carbon intensity
-         * @deprecated
-         * @description Routes to NESO for GB and to Electricity Maps for everything else. Defaults to Cloudflare-detected location (postcode or city).
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country). */
-                    zone?: string;
-                    postcode?: string;
-                    regionid?: number | null;
-                    horizon?: "latest" | "24h" | "48h";
-                    source?: "auto" | "electricitymaps" | "neso";
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description 1.x response shape. Use /v2/intensity. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["GridIntensityResponseV1"];
-                    };
-                };
-                /** @description Missing or invalid query parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-                /** @description NESO-only data requested from a non-UK origin */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v2/zones": {
         parameters: {
             query?: never;
@@ -156,45 +91,6 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ZoneList"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/zones": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Electricity Maps zones
-         * @deprecated
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description 1.x response shape. Use /v2/zones. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ZoneListV1"];
                     };
                 };
             };
@@ -393,67 +289,6 @@ export interface components {
                 provider?: "electricitymaps" | "neso" | "bmrs";
             };
         };
-        GridIntensityResponseV1: {
-            /**
-             * @description Which upstream answered this request
-             * @example neso
-             * @enum {string}
-             */
-            source: "electricitymaps" | "neso" | "co2js";
-            /** @description Echoes back where this response is about, so you never have to re-parse the request. */
-            location: {
-                /** @description Electricity Maps zone code (always "GB" for NESO responses). */
-                zone: string;
-                /** @description GB DNO region detail, when known. id/name are only ever present for NESO regional responses; nation may be present on its own when only a coarser signal (e.g. Cloudflare's detected nation) was available. */
-                region: {
-                    id?: number;
-                    name?: string;
-                    /** @enum {string} */
-                    nation?: "England" | "Scotland" | "Wales";
-                    /** @description True when none of id/name/nation could be determined for this request. */
-                    unknown: boolean;
-                };
-            };
-            /**
-             * @description Start of the reporting period, ISO 8601 UTC.
-             * @example 2026-09-11T12:00:00.000Z
-             */
-            datetime: string;
-            /** @description End of the reporting period, when known. */
-            validTo?: string;
-            /** @description The carbon intensity figure itself. */
-            carbonIntensity: {
-                /**
-                 * @description The carbon intensity figure, in `unit`. `null` when `band` is "unknown".
-                 * @example 123
-                 */
-                value: number | null;
-                /** @enum {string} */
-                unit: "gCO2eq/kWh";
-                /**
-                 * @description "actual" = measured (NESO national, when available), "forecast" = NESO's forward estimate (national fallback and all regional data), "estimated" = Electricity Maps' modeled figure (or its annual average, for CO2.js fallbacks), "unknown" = an upstream provider failed or returned unusable data.
-                 * @enum {string}
-                 */
-                type: "actual" | "forecast" | "estimated" | "unknown";
-                /**
-                 * @description Coarse category for the value. GB responses use NESO's own index (recalculated by NESO each year against GB's own grid); other zones use generic, approximate global thresholds since no equivalent official index exists worldwide. "unknown" means an upstream provider failed or returned unusable data, see `fallback.reason`.
-                 * @example moderate
-                 * @enum {string}
-                 */
-                band: "low" | "moderate" | "high" | "very-high" | "unknown";
-            };
-            /** @description Fuel mix behind this figure. Only returned for NESO regional responses. */
-            generationMix?: {
-                fuel: string;
-                percentage: number;
-            }[];
-            /** @description Near-future periods covering the requested horizon window (NESO: 30-minute periods; Electricity Maps: hourly), including the period already summarized above. Present only when `horizon` is "24h" or "48h", and never for CO2.js fallbacks. */
-            forecast?: components["schemas"]["ForecastPoint"][];
-            /** @description Present when a GB request was redirected from NESO to Electricity Maps because the caller wasn't UK-origin, or when the intended upstream provider failed. Failures fall back from NESO to Electricity Maps' GB zone, then to Electricity Maps' latest annual average via CO2.js (`source: "co2js"`), and only report `band`/`type` as "unknown" if the zone isn't in that dataset either. */
-            fallback?: {
-                reason: string;
-            };
-        };
         ZoneList: {
             zones: {
                 [key: string]: {
@@ -463,12 +298,6 @@ export interface components {
             };
             /** @description Credits for each source used in this response. Keep them with the data if you display or redistribute it. */
             attribution: components["schemas"]["Attribution"][];
-        };
-        ZoneListV1: {
-            [key: string]: {
-                zoneName?: string;
-                countryName?: string;
-            };
         };
     };
     responses: never;
