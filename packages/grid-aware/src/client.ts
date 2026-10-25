@@ -30,6 +30,15 @@ export interface GridAwareClient {
   getSuggestedWindow(
     query?: Omit<IntensityQuery, "surplus"> & { durationMinutes?: number },
   ): Promise<SuggestedWindow | undefined>;
+  /**
+   * When to start a job, as an ISO 8601 UTC timestamp, from `/v2/suggest`. Works in every zone.
+   * Never earlier than now, and the current time when the forecast is unavailable.
+   * `durationMinutes` defaults to 30. `withinMinutes` limits how far ahead to look (default: 48 hours).
+   * `goodEnoughBand` returns the earliest window at or below that band instead of the cleanest.
+   */
+  getSuggestedISOTimestamp(
+    query?: Omit<IntensityQuery, "surplus"> & { durationMinutes?: number; withinMinutes?: number; goodEnoughBand?: "low" | "moderate" | "high" },
+  ): Promise<string>;
 }
 
 /** A typed fetch client for a grid-aware worker's API. */
@@ -58,6 +67,13 @@ export function createGridAwareClient(baseUrl: string): GridAwareClient {
     getSuggestedWindow: async ({ durationMinutes, ...query } = {}) => {
       const data = await fetchIntensity({ ...query, horizon: "latest", surplus: durationMinutes ?? true });
       return data.surplus?.derived?.suggested?.window;
+    },
+    getSuggestedISOTimestamp: async ({ durationMinutes, withinMinutes, goodEnoughBand, ...query } = {}) => {
+      const { data, error } = await client.GET("/v2/suggest", {
+        params: { query: { ...query, duration: durationMinutes, within: withinMinutes, band: goodEnoughBand } },
+      });
+      if (error || !data) throw new Error("grid-aware: failed to fetch a suggested time");
+      return data.start;
     },
   };
 }

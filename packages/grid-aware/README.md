@@ -99,6 +99,15 @@ zones or if the forecast is unavailable. `from` can be the current half-hour, wh
 the best time". The `SuggestedWindow` type is exported. The same data is on `surplus.derived.suggested.window`
 if you request `surplus` through `getCurrentIntensity`/`getForecast`.
 
+For just the start time, as an ISO 8601 timestamp, use `getSuggestedISOTimestamp`. It calls `/v2/suggest`:
+
+```ts
+const start = await client.getSuggestedISOTimestamp({ regionid: 13, durationMinutes: 90 });
+// "2026-10-25T18:30:00.000Z"
+```
+
+Pass `withinMinutes` to limit how far ahead it looks (default: the next 48 hours). It works in every zone. It is never earlier than now, and is the current time if the forecast is unavailable.
+
 ## Regenerating the API client
 
 ```

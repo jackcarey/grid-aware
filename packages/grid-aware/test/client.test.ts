@@ -114,6 +114,61 @@ describe("createGridAwareClient", () => {
     expect(fetchStub.requestedUrl().searchParams.get("surplus")).toBe("true");
   });
 
+  it("getSuggestedISOTimestamp calls /v2/suggest and returns the start", async () => {
+    const fetchStub = stubFetch({
+      start: "2026-01-01T02:00:00.000Z",
+      end: "2026-01-01T03:30:00.000Z",
+      averageIntensity: 42,
+      unit: "gCO2eq/kWh",
+      durationMinutes: 90,
+      attribution: [],
+    });
+    const client = createGridAwareClient("https://example.com");
+
+    const result = await client.getSuggestedISOTimestamp({ regionid: 13, durationMinutes: 90 });
+
+    expect(result).toBe("2026-01-01T02:00:00.000Z");
+    const url = fetchStub.requestedUrl();
+    expect(url.pathname).toBe("/v2/suggest");
+    expect(url.searchParams.get("duration")).toBe("90");
+    expect(url.searchParams.get("regionid")).toBe("13");
+  });
+
+  it("getSuggestedISOTimestamp leaves duration and within to the API defaults", async () => {
+    const fetchStub = stubFetch({ start: "2026-01-01T00:00:00.000Z", unit: "gCO2eq/kWh", durationMinutes: 30, attribution: [] });
+    const client = createGridAwareClient("https://example.com");
+
+    await client.getSuggestedISOTimestamp({ zone: "FR" });
+
+    expect(fetchStub.requestedUrl().searchParams.has("duration")).toBe(false);
+    expect(fetchStub.requestedUrl().searchParams.has("within")).toBe(false);
+  });
+
+  it("getSuggestedISOTimestamp sends withinMinutes as within", async () => {
+    const fetchStub = stubFetch({ start: "2026-01-01T00:00:00.000Z", unit: "gCO2eq/kWh", durationMinutes: 30, attribution: [] });
+    const client = createGridAwareClient("https://example.com");
+
+    await client.getSuggestedISOTimestamp({ zone: "FR", withinMinutes: 360 });
+
+    expect(fetchStub.requestedUrl().searchParams.get("within")).toBe("360");
+  });
+
+  it("getSuggestedISOTimestamp sends goodEnoughBand as band", async () => {
+    const fetchStub = stubFetch({ start: "2026-01-01T00:00:00.000Z", unit: "gCO2eq/kWh", durationMinutes: 30, attribution: [] });
+    const client = createGridAwareClient("https://example.com");
+
+    await client.getSuggestedISOTimestamp({ zone: "FR", goodEnoughBand: "moderate" });
+
+    expect(fetchStub.requestedUrl().searchParams.get("band")).toBe("moderate");
+  });
+
+  it("getSuggestedISOTimestamp throws when the API responds with an error", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ error: { message: "bad" } }), { status: 400 }));
+    const client = createGridAwareClient("https://example.com");
+
+    await expect(client.getSuggestedISOTimestamp({ regionid: 13 })).rejects.toThrow(/failed to fetch a suggested time/);
+  });
+
   it("throws when the API responds with an error", async () => {
     vi.stubGlobal(
       "fetch",
