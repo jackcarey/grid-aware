@@ -5,13 +5,13 @@ import {
   waitOnExecutionContext,
 } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import type { Env } from "../../src/platform/cloudflare.js";
 import {
   createCloudflareCacheStore,
+  type Env,
   getCountry,
   getPostcode,
   isOverRegionalRateLimit,
-} from "../../src/platform/cloudflare.js";
+} from "../src/index.js";
 
 describe("getCountry", () => {
   it("reads request.cf.country when present", () => {

@@ -1,4 +1,4 @@
-import { NESO_ATTRIBUTION } from "../../../worker/src/attribution.js";
+import { NESO_ATTRIBUTION } from "grid-aware-core/attribution";
 import { MAX_WINDOW_MINUTES, parseArgs } from "./args.js";
 import type { Config } from "./config.js";
 import type { ExecResult } from "./gwf.js";

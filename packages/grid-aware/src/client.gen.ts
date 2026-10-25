@@ -1,5 +1,5 @@
 // GENERATED FILE - do not edit by hand.
-// Run `npm run generate:client` (openapi-typescript against ../../worker/openapi.json).
+// Run `npm run generate:client` (openapi-typescript against ../../packages/core/openapi.json).
 export interface paths {
     "/v2/intensity": {
         parameters: {

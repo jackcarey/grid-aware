@@ -1,4 +1,4 @@
-import { buildSurplus, normalizeNesoNational, normalizeNesoRegional } from "../../../worker/src/normalize.js";
+import { buildSurplus, normalizeNesoNational, normalizeNesoRegional } from "grid-aware-core/normalize";
 import {
   getNationalIntensity,
   getRegionalByPostcode,
@@ -6,7 +6,7 @@ import {
   getRegionalNational,
   type NesoRegion,
   type NesoRegionalResponse,
-} from "../../../worker/src/providers/neso.js";
+} from "grid-aware-core/providers/neso";
 
 /** A record in the shape `grid-intensity` prints, so scripts can read every provider the same way. */
 export interface GwfRecord {

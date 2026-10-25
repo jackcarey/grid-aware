@@ -1,7 +1,4 @@
-import { createApp } from "../app.js";
-import { parseAllowedOrigins } from "../config.js";
-import { toOutwardPostcode } from "../geo.js";
-import type { AppDeps, CacheStore } from "../ports.js";
+import { type AppDeps, type CacheStore, createApp, parseAllowedOrigins, toOutwardPostcode } from "grid-aware-core";
 
 export interface Env {
   ELECTRICITY_MAPS_TOKEN?: string;

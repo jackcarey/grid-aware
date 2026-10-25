@@ -14,7 +14,8 @@ function syncVersion(relativePath) {
   console.log(`Updated ${relativePath} to ${version}`);
 }
 
-syncVersion("worker/package.json");
+syncVersion("apps/cloudflare-worker/package.json");
+syncVersion("packages/core/package.json");
 syncVersion("packages/grid-aware/package.json");
 syncVersion("packages/grid-aware/jsr.json");
 syncVersion("packages/cli/package.json");

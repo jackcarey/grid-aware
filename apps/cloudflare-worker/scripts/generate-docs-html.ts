@@ -240,7 +240,7 @@ ${renderApiReference(doc)}
 `;
 }
 
-const specPath = fileURLToPath(new URL("../openapi.json", import.meta.url));
+const specPath = fileURLToPath(new URL("../../../packages/core/openapi.json", import.meta.url));
 const doc = JSON.parse(readFileSync(specPath, "utf8")) as OpenApiDocument;
 const html = renderPage(doc);
 

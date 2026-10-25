@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import openapiTS, { astToString } from "openapi-typescript";
 
 const specPath = fileURLToPath(
-  new URL("../../../worker/openapi.json", import.meta.url),
+  new URL("../../../packages/core/openapi.json", import.meta.url),
 );
 const outPath = fileURLToPath(new URL("../src/client.gen.ts", import.meta.url));
 
@@ -12,6 +12,6 @@ const output = astToString(ast);
 
 writeFileSync(
   outPath,
-  `// GENERATED FILE - do not edit by hand.\n// Run \`npm run generate:client\` (openapi-typescript against ../../worker/openapi.json).\n${output}`,
+  `// GENERATED FILE - do not edit by hand.\n// Run \`npm run generate:client\` (openapi-typescript against ../../packages/core/openapi.json).\n${output}`,
 );
 console.log(`Wrote ${outPath}`);

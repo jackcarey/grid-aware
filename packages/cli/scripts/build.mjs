@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 
-// Bundled because JSR can't publish the worker code this imports from outside the package folder.
+// Bundled because JSR can't publish the grid-aware-core code this imports from another package.
 await build({
   entryPoints: ["src/cli.ts"],
   bundle: true,

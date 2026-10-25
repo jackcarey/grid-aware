@@ -1,7 +1,7 @@
 # @web-components/grid-aware
 
 Sets a `data-grid-aware` attribute (`low` | `moderate` | `high` | `very-high` | `unknown`) on
-`<html>`, reflecting the current grid carbon intensity from a [grid-aware worker](../../worker)
+`<html>`, reflecting the current grid carbon intensity from a [grid-aware worker](../../apps/cloudflare-worker)
 deployment. `unknown` means the fetch failed or every upstream provider the worker tried (including its
 CO2.js annual-average fallback) failed.
 
@@ -105,5 +105,5 @@ if you request `surplus` through `getCurrentIntensity`/`getForecast`.
 npm run generate:client
 ```
 
-Runs `openapi-typescript` against `../../worker/openapi.json` and writes `src/client.gen.ts`.
+Runs `openapi-typescript` against `../../packages/core/openapi.json` and writes `src/client.gen.ts`.
 Use this to regenerate whenever the worker's changes.

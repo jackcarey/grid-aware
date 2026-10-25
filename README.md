@@ -7,8 +7,11 @@ Combines [Electricity Maps](https://electricitymaps.com) (global grid carbon int
 
 _version numbers are synced across packages_
 
-- [`worker/`](worker) - the Cloudflare Worker API (Hono + `@hono/zod-openapi`), host-agnostic core
-  with a thin Cloudflare-specific adapter in `src/platform/cloudflare.ts`.
+- [`packages/core/`](packages/core) - the host-agnostic API (Hono + `@hono/zod-openapi`): routes, providers,
+  normalisation and the OpenAPI spec. It takes its platform pieces (cache, geolocation, rate limits) as
+  dependencies, so it isn't tied to Cloudflare.
+- [`apps/cloudflare-worker/`](apps/cloudflare-worker) - the Cloudflare Worker that runs the core: the adapter in `src/index.ts`,
+  `wrangler.toml`, and the static landing page and widget bundle.
 - [`packages/grid-aware/`](packages/grid-aware) - `@web-components/grid-aware` on JSR, a small
   client + `<script>`-tag widget consuming the worker's API.
 - [`packages/cli/`](packages/cli) - a `grid-aware` command that wraps the Green Web Foundation's
@@ -18,8 +21,8 @@ _version numbers are synced across packages_
 
 ```
 npm install
-npm run generate      # writes worker/openapi.json, worker/src/pages/index.html.ts,
-                       # worker/src/pages/widget.js.ts, and packages/grid-aware/src/client.gen.ts
+npm run generate      # writes packages/core/openapi.json, packages/grid-aware/src/client.gen.ts,
+                       # and apps/cloudflare-worker/public/ (landing page and widget bundles)
 npm run typecheck
 npm test
 ```
@@ -27,7 +30,7 @@ npm test
 ### Running locally
 
 ```
-cd worker
+cd apps/cloudflare-worker
 cp .dev.vars.example .dev.vars   # fill in ELECTRICITY_MAPS_TOKEN and ALLOWED_ORIGINS
 npx wrangler dev
 ```
@@ -115,7 +118,7 @@ used. Keep these with the data if you display or redistribute it.
 ### Deploying
 
 ```
-cd worker
+cd apps/cloudflare-worker
 npx wrangler login                        # once
 npx wrangler secret put ELECTRICITY_MAPS_TOKEN
 npx wrangler secret put ALLOWED_ORIGINS
@@ -147,10 +150,8 @@ under the scope and the same Trusted Publisher link). JSR gets the bundled `dist
 ## Versioning
 
 Root `package.json`'s `version` is the single source of truth for the whole repo. `npm run
-generate` (run in CI, and in the pre-commit hook) copies it into `worker/package.json`,
-`packages/grid-aware/package.json`, `packages/grid-aware/jsr.json`, `packages/cli/package.json` and
-`packages/cli/jsr.json` via `scripts/sync-version.mjs`;
-the OpenAPI `info.version` in `worker/src/app.ts` reads `worker/package.json` directly. So bumping
+generate` (run in CI, and in the pre-commit hook) copies it into `apps/cloudflare-worker/package.json`, `packages/core/package.json`, `packages/grid-aware/package.json`, `packages/grid-aware/jsr.json`, `packages/cli/package.json` and `packages/cli/jsr.json` via `scripts/sync-version.mjs`;
+the OpenAPI `info.version` in `packages/core/src/app.ts` reads `packages/core/package.json` directly. So bumping
 the version only means editing root `package.json` and committing the files the pre-commit hook
 regenerates. Pushing that to `main` makes CI's `release` job cut the matching git tag / GitHub
 release automatically, which triggers the JSR publishes.

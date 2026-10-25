@@ -8,7 +8,7 @@ mkdirSync(outDir, { recursive: true });
 /** Bundles one browser package entry point into public/. */
 async function bundle(entryName: string, format: "esm" | "iife", outName: string): Promise<void> {
   const entryPoint = fileURLToPath(
-    new URL(`../../packages/grid-aware/src/${entryName}`, import.meta.url),
+    new URL(`../../../packages/grid-aware/src/${entryName}`, import.meta.url),
   );
   const result = await build({
     entryPoints: [entryPoint],
