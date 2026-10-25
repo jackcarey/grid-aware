@@ -460,6 +460,65 @@
           "error"
         ]
       },
+      "SuggestionResponse": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "example": "2026-10-25T13:00:00.000Z",
+            "description": "When to start the job, ISO 8601 UTC. The current time when no better time is known."
+          },
+          "end": {
+            "type": "string",
+            "example": "2026-10-25T14:00:00.000Z",
+            "description": "End of the suggested window. Absent when `start` is the current time and there is no window."
+          },
+          "averageIntensity": {
+            "type": "number",
+            "example": 95,
+            "description": "Average carbon intensity over the window, in `unit`."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "gCO2eq/kWh"
+            ]
+          },
+          "durationMinutes": {
+            "type": "number",
+            "description": "The job length the window was sized for."
+          },
+          "withinBand": {
+            "type": "boolean",
+            "description": "Only present when `band` was asked for. True if every period in the window is at or below that band; false if none was, and the window is the cleanest one instead."
+          },
+          "attribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attribution"
+            },
+            "description": "Credits for each source used in this response. Keep them with the data if you display or redistribute it."
+          },
+          "fallback": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "description": "Present when `start` is the current time because no window could be worked out, such as when the forecast was unavailable."
+          }
+        },
+        "required": [
+          "start",
+          "unit",
+          "durationMinutes",
+          "attribution"
+        ]
+      },
       "ZoneList": {
         "type": "object",
         "properties": {
@@ -590,6 +649,119 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GridIntensityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "NESO-only data requested from a non-UK origin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/suggest": {
+      "get": {
+        "summary": "Suggest when to start a job",
+        "description": "The start of the lowest-intensity window in the next 48 hours that is long enough for the job, optionally limited to starting within a number of minutes. Works for every zone. When no window can be worked out it returns the current time with a `fallback` reason.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "FR",
+              "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country)."
+            },
+            "required": false,
+            "description": "Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country).",
+            "name": "zone",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "SW1A"
+            },
+            "required": false,
+            "name": "postcode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "example": 13
+            },
+            "required": false,
+            "name": "regionid",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2880,
+              "default": 30,
+              "example": 90,
+              "description": "Job length in minutes (max 2880)."
+            },
+            "required": false,
+            "description": "Job length in minutes (max 2880).",
+            "name": "duration",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2880,
+              "example": 360,
+              "description": "Latest the job may start, in minutes from now. Without it the whole next 48 hours is searched."
+            },
+            "required": false,
+            "description": "Latest the job may start, in minutes from now. Without it the whole next 48 hours is searched.",
+            "name": "within",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "low",
+                "moderate",
+                "high"
+              ],
+              "example": "moderate",
+              "description": "Good enough: return the earliest window in which every period is at or below this band, rather than the cleanest. If there is none, the cleanest window is returned and `withinBand` is false."
+            },
+            "required": false,
+            "description": "Good enough: return the earliest window in which every period is at or below this band, rather than the cleanest. If there is none, the cleanest window is returned and `withinBand` is false.",
+            "name": "band",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The best time to start a job of the given length in the next 48 hours",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionResponse"
                 }
               }
             }

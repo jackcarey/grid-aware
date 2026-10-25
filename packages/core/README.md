@@ -8,6 +8,7 @@ The grid-aware API with no hosting assumptions. It is a [Hono](https://hono.dev)
 |---|---|
 | `GET /v2/intensity` | Current intensity, forecast and, for GB, suggested run times. |
 | `GET /v2/zones` | Supported zones. |
+| `GET /v2/suggest` | The best start time for a job of a given length, as an ISO timestamp. |
 | `GET /openapi.json` | The OpenAPI spec. |
 
 Parameters and response shapes are in [`openapi.json`](openapi.json).

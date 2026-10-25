@@ -5,6 +5,7 @@ import type { ElectricityMapsForecast, ElectricityMapsLatest } from "./providers
 import type { NesoIntensityPeriod, NesoRegion, NesoRegionalPeriod } from "./providers/neso.js";
 import type { NesoDailyWind } from "./providers/nesoDataPortal.js";
 import type {
+  Band,
   BmrsSurplus,
   DerivedSurplusDay,
   ForecastPoint,
@@ -102,8 +103,62 @@ export function renewablePercentage(mix: readonly GenerationMixEntry[]): number 
   return Math.round(total * 10) / 10;
 }
 
-/** NESO forecasts in half-hour periods. */
-const PERIOD_MINUTES = 30;
+/** NESO's period length, used when the points don't say. */
+const DEFAULT_PERIOD_MINUTES = 30;
+
+/** Minutes each point covers: NESO states it with `validTo`, Electricity Maps only by the gap to the next point. */
+function periodMinutes(points: readonly ForecastPoint[]): number {
+  const [first, second] = points;
+  const end = first?.validTo ?? second?.datetime;
+  const minutes = first && end ? (Date.parse(end) - Date.parse(first.datetime)) / 60_000 : Number.NaN;
+  return minutes > 0 ? minutes : DEFAULT_PERIOD_MINUTES;
+}
+
+export interface BestWindowOptions {
+  /** Latest time the job may start. The period already under way always qualifies. */
+  startBefore?: Date;
+  /** Earliest time the job can start. Periods that have already ended are skipped. */
+  startAfter?: Date;
+}
+
+interface Run {
+  points: readonly ForecastPoint[];
+  total: number;
+}
+
+/** Every run of whole periods long enough for the job that starts inside the bounds and has no gaps, earliest first. */
+function candidateRuns(
+  points: readonly ForecastPoint[],
+  durationMinutes: number,
+  options: BestWindowOptions,
+): { runs: Run[]; size: number; period: number } {
+  const period = periodMinutes(points);
+  const size = Math.ceil(durationMinutes / period);
+  const runs: Run[] = [];
+  for (let start = 0; start + size <= points.length; start++) {
+    const run = points.slice(start, start + size);
+    const first = run[0];
+    if (!first) continue;
+    if (options.startBefore && Date.parse(first.datetime) > options.startBefore.getTime()) continue;
+    const firstEnd = Date.parse(first.validTo ?? first.datetime) + (first.validTo ? 0 : period * 60_000);
+    if (options.startAfter && firstEnd <= options.startAfter.getTime()) continue;
+    if (run.some((p) => p.value === null)) continue;
+    runs.push({ points: run, total: run.reduce((sum, p) => sum + (p.value ?? 0), 0) });
+  }
+  return { runs, size, period };
+}
+
+function toWindow(run: Run, size: number, period: number): SuggestedWindow | undefined {
+  const first = run.points[0];
+  const last = run.points.at(-1);
+  if (!first || !last) return undefined;
+  return {
+    from: first.datetime,
+    to: last.validTo ?? new Date(Date.parse(last.datetime) + period * 60_000).toISOString(),
+    averageIntensity: Math.round(run.total / size),
+    unit: "gCO2eq/kWh",
+  };
+}
 
 /**
  * The lowest-intensity run of consecutive periods long enough for a job, with the earliest run
@@ -112,24 +167,31 @@ const PERIOD_MINUTES = 30;
 export function bestWindow(
   points: readonly ForecastPoint[],
   durationMinutes: number,
+  options: BestWindowOptions = {},
 ): SuggestedWindow | undefined {
-  const size = Math.ceil(durationMinutes / PERIOD_MINUTES);
-  let best: { run: readonly ForecastPoint[]; total: number } | undefined;
-  for (let start = 0; start + size <= points.length; start++) {
-    const run = points.slice(start, start + size);
-    if (run.some((p) => p.value === null)) continue;
-    const total = run.reduce((sum, p) => sum + (p.value ?? 0), 0);
-    if (!best || total < best.total) best = { run, total };
+  const { runs, size, period } = candidateRuns(points, durationMinutes, options);
+  let best: Run | undefined;
+  for (const run of runs) {
+    if (!best || run.total < best.total) best = run;
   }
-  const first = best?.run[0];
-  const last = best?.run.at(-1);
-  if (!best || !first || !last) return undefined;
-  return {
-    from: first.datetime,
-    to: last.validTo ?? last.datetime,
-    averageIntensity: Math.round(best.total / size),
-    unit: "gCO2eq/kWh",
-  };
+  return best && toWindow(best, size, period);
+}
+
+const BAND_RANK: Record<Band, number> = { low: 1, moderate: 2, high: 3, "very-high": 4, unknown: Number.POSITIVE_INFINITY };
+
+/**
+ * The earliest run in which every period is at or below `maxBand`, which is not necessarily the
+ * cleanest. A period of unknown band never qualifies.
+ */
+export function earliestWindowWithin(
+  points: readonly ForecastPoint[],
+  durationMinutes: number,
+  maxBand: Band,
+  options: BestWindowOptions = {},
+): SuggestedWindow | undefined {
+  const { runs, size, period } = candidateRuns(points, durationMinutes, options);
+  const run = runs.find((candidate) => candidate.points.every((p) => BAND_RANK[p.band] <= BAND_RANK[maxBand]));
+  return run && toWindow(run, size, period);
 }
 
 /** The day ranked 1. */
@@ -151,16 +213,18 @@ export interface SurplusInputs {
   wind?: readonly NesoDailyWind[];
   /** Only regional responses have a mix, so only they get the regional proxy. */
   regionalMix?: readonly GenerationMixEntry[];
-  /** The next 48 hours of half-hourly intensity for the same place. */
+  /** The next 48 hours of intensity for the same place. */
   next48h?: readonly ForecastPoint[];
   durationMinutes: number;
+  /** Latest time the suggested window may start. */
+  startBefore?: Date;
 }
 
 /** Assembles the `surplus` field. Returns undefined when there's nothing to report. */
 export function buildSurplus(input: SurplusInputs): Surplus | undefined {
-  const { bmrs, demand, wind, regionalMix, next48h, durationMinutes } = input;
+  const { bmrs, demand, wind, regionalMix, next48h, durationMinutes, startBefore } = input;
   const forecast = bmrs && deriveSurplusDays(bmrs, demand, wind);
-  const window = next48h && bestWindow(next48h, durationMinutes);
+  const window = next48h && bestWindow(next48h, durationMinutes, { startBefore });
   const day = bmrs && forecast && bestDay(bmrs, forecast);
   if (!bmrs && !regionalMix && !window) return undefined;
   return {

@@ -3,6 +3,7 @@ import { bmrsAttribution } from "../src/attribution.js";
 import {
   bestDay,
   bestWindow,
+  earliestWindowWithin,
   deriveSurplusDays,
   normalizeBmrsSurplus,
   normalizeElectricityMapsForecast,
@@ -390,6 +391,75 @@ describe("bestWindow", () => {
 
   it("returns undefined when the job is longer than the forecast", () => {
     expect(bestWindow([point("00", 10)], 60)).toBeUndefined();
+  });
+
+  describe("with hourly points that have no validTo", () => {
+    const hourly = (hh: string, value: number) => ({
+      datetime: `2026-01-01T${hh}:00:00.000Z`,
+      value,
+      type: "forecast" as const,
+      band: "low" as const,
+    });
+    const points = [hourly("00", 100), hourly("01", 50), hourly("02", 200)];
+
+    it("takes the period from the gap between points and ends the window after the last one", () => {
+      expect(bestWindow(points, 60)).toEqual({
+        from: "2026-01-01T01:00:00.000Z",
+        to: "2026-01-01T02:00:00.000Z",
+        averageIntensity: 50,
+        unit: "gCO2eq/kWh",
+      });
+    });
+
+    it("rounds the job up to whole hours", () => {
+      expect(bestWindow(points, 90)?.to).toBe("2026-01-01T02:00:00.000Z");
+      expect(bestWindow(points, 90)?.averageIntensity).toBe(75);
+    });
+  });
+
+  it("only considers runs that start by startBefore", () => {
+    const points = [point("00", 90), point("01", 40), point("02", 10)];
+    expect(bestWindow(points, 30)?.from).toBe("2026-01-01T02:00Z");
+    expect(bestWindow(points, 30, { startBefore: new Date("2026-01-01T01:30:00Z") })?.from).toBe("2026-01-01T01:00Z");
+  });
+
+  it("skips periods that ended before startAfter, but not the one under way", () => {
+    const points = [point("00", 10), point("01", 40), point("02", 90)];
+    expect(bestWindow(points, 30, { startAfter: new Date("2026-01-01T00:45:00Z") })?.from).toBe("2026-01-01T01:00Z");
+    expect(bestWindow(points, 30, { startAfter: new Date("2026-01-01T00:15:00Z") })?.from).toBe("2026-01-01T00:00Z");
+  });
+});
+
+describe("earliestWindowWithin", () => {
+  const point = (hh: string, value: number, band: "low" | "moderate" | "high" | "very-high" | "unknown") => ({
+    datetime: `2026-01-01T${hh}:00Z`,
+    validTo: `2026-01-01T${hh}:30Z`,
+    value,
+    type: "forecast" as const,
+    band,
+  });
+  const points = [point("00", 300, "high"), point("01", 150, "moderate"), point("02", 40, "low"), point("03", 160, "moderate")];
+
+  it("returns the earliest window at or below the band, not the cleanest", () => {
+    expect(earliestWindowWithin(points, 30, "moderate")?.from).toBe("2026-01-01T01:00Z");
+    expect(bestWindow(points, 30)?.from).toBe("2026-01-01T02:00Z");
+  });
+
+  it("needs every period of the job to qualify", () => {
+    // 00 is high, so a two-period job at 01 + 02 is the first run that is all moderate or better.
+    expect(earliestWindowWithin(points, 60, "moderate")?.from).toBe("2026-01-01T01:00Z");
+    expect(earliestWindowWithin([point("00", 150, "moderate"), point("01", 300, "high"), point("02", 40, "low")], 60, "moderate")).toBeUndefined();
+  });
+
+  it("is undefined when no run qualifies, and never accepts an unknown band", () => {
+    expect(earliestWindowWithin(points, 30, "low")?.from).toBe("2026-01-01T02:00Z");
+    expect(earliestWindowWithin([point("00", 300, "high")], 30, "moderate")).toBeUndefined();
+    expect(earliestWindowWithin([point("00", 40, "unknown")], 30, "high")).toBeUndefined();
+  });
+
+  it("respects the start bounds", () => {
+    expect(earliestWindowWithin(points, 30, "moderate", { startAfter: new Date("2026-01-01T01:45:00Z") })?.from).toBe("2026-01-01T02:00Z");
+    expect(earliestWindowWithin(points, 30, "low", { startBefore: new Date("2026-01-01T01:30:00Z") })).toBeUndefined();
   });
 });
 

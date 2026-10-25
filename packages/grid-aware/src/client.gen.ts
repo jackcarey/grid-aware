@@ -67,6 +67,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest when to start a job
+         * @description The start of the lowest-intensity window in the next 48 hours that is long enough for the job, optionally limited to starting within a number of minutes. Works for every zone. When no window can be worked out it returns the current time with a `fallback` reason.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Electricity Maps zone code. If omitted along with postcode/regionid, defaults to the caller's own location as detected by Cloudflare (a UK postcode where available, else the caller's country). */
+                    zone?: string;
+                    postcode?: string;
+                    regionid?: number | null;
+                    /** @description Job length in minutes (max 2880). */
+                    duration?: number;
+                    /** @description Latest the job may start, in minutes from now. Without it the whole next 48 hours is searched. */
+                    within?: number;
+                    /** @description Good enough: return the earliest window in which every period is at or below this band, rather than the cleanest. If there is none, the cleanest window is returned and `withinBand` is false. */
+                    band?: "low" | "moderate" | "high";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The best time to start a job of the given length in the next 48 hours */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuggestionResponse"];
+                    };
+                };
+                /** @description Missing or invalid query parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description NESO-only data requested from a non-UK origin */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v2/zones": {
         parameters: {
             query?: never;
@@ -287,6 +355,35 @@ export interface components {
                 message: string;
                 /** @enum {string} */
                 provider?: "electricitymaps" | "neso" | "bmrs";
+            };
+        };
+        SuggestionResponse: {
+            /**
+             * @description When to start the job, ISO 8601 UTC. The current time when no better time is known.
+             * @example 2026-10-25T13:00:00.000Z
+             */
+            start: string;
+            /**
+             * @description End of the suggested window. Absent when `start` is the current time and there is no window.
+             * @example 2026-10-25T14:00:00.000Z
+             */
+            end?: string;
+            /**
+             * @description Average carbon intensity over the window, in `unit`.
+             * @example 95
+             */
+            averageIntensity?: number;
+            /** @enum {string} */
+            unit: "gCO2eq/kWh";
+            /** @description The job length the window was sized for. */
+            durationMinutes: number;
+            /** @description Only present when `band` was asked for. True if every period in the window is at or below that band; false if none was, and the window is the cleanest one instead. */
+            withinBand?: boolean;
+            /** @description Credits for each source used in this response. Keep them with the data if you display or redistribute it. */
+            attribution: components["schemas"]["Attribution"][];
+            /** @description Present when `start` is the current time because no window could be worked out, such as when the forecast was unavailable. */
+            fallback?: {
+                reason: string;
             };
         };
         ZoneList: {

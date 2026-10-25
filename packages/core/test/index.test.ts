@@ -34,6 +34,7 @@ describe("app: public routes", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { paths: Record<string, unknown> };
     expect(body.paths["/v2/intensity"]).toBeDefined();
+    expect(body.paths["/v2/suggest"]).toBeDefined();
     expect(Object.keys(body.paths).filter((p) => p.startsWith("/v1/"))).toEqual([]);
   });
 });
@@ -1023,6 +1024,196 @@ describe("app: /v2/intensity surplus", () => {
       to: "2026-01-01T02:00Z",
       averageIntensity: 43,
       unit: "gCO2eq/kWh",
+    });
+  });
+
+  describe("/v2/suggest", () => {
+    type Suggestion = {
+      start: string;
+      end?: string;
+      averageIntensity?: number;
+      unit: string;
+      durationMinutes: number;
+      attribution: { source: string }[];
+      fallback?: { reason: string };
+    };
+
+    const suggest = async (app: ReturnType<typeof createApp>, query: string) =>
+      app.request(`/v2/suggest?${query}`, { headers: { Origin: ALLOWED_ORIGIN } });
+
+    // Fake only Date, so the fetch mocks and the cache keep working.
+    const at = (iso: string) => vi.useFakeTimers({ toFake: ["Date"], now: new Date(iso) });
+    afterEach(() => vi.useRealTimers());
+
+    it("returns the start of the best window for the job length as an ISO timestamp", async () => {
+      at("2026-01-01T00:00:00Z");
+      const fetchMock = routedFetch();
+      vi.stubGlobal("fetch", fetchMock);
+      const res = await suggest(createApp(buildDeps()), "regionid=13&duration=90");
+      expect(res.status).toBe(200);
+      expect((await res.json()) as Suggestion).toEqual({
+        start: "2026-01-01T00:30:00.000Z",
+        end: "2026-01-01T02:00:00.000Z",
+        averageIntensity: 43,
+        unit: "gCO2eq/kWh",
+        durationMinutes: 90,
+        attribution: [expect.objectContaining({ source: "neso" })],
+      });
+      // Only the window is wanted, so the surplus datasets are never fetched.
+      expect(fetchMock.mock.calls.some(([url]) => isBmrsUrl(url))).toBe(false);
+    });
+
+    it("defaults to a 30 minute job", async () => {
+      at("2026-01-01T00:00:00Z");
+      vi.stubGlobal("fetch", routedFetch());
+      const body = (await (await suggest(createApp(buildDeps()), "regionid=13")).json()) as Suggestion;
+      expect(body.durationMinutes).toBe(30);
+      expect(body.start).toBe("2026-01-01T01:30:00.000Z");
+    });
+
+    it("with band, returns the earliest window at or below it instead of the cleanest", async () => {
+      at("2026-01-01T00:10:00Z");
+      vi.stubGlobal("fetch", routedFetch());
+      const app = createApp(buildDeps());
+      // Every period in the mock is moderate, so the earliest one qualifies although 01:30 is cleaner.
+      const good = (await (await suggest(app, "regionid=13&band=moderate")).json()) as Suggestion & { withinBand?: boolean };
+      expect(good.start).toBe("2026-01-01T00:10:00.000Z");
+      expect(good.withinBand).toBe(true);
+      const plain = (await (await suggest(app, "regionid=13")).json()) as Suggestion & { withinBand?: boolean };
+      expect(plain.start).toBe("2026-01-01T01:30:00.000Z");
+      expect(plain).not.toHaveProperty("withinBand");
+    });
+
+    it("with band, falls back to the cleanest window and says nothing was in band", async () => {
+      at("2026-01-01T00:10:00Z");
+      vi.stubGlobal("fetch", routedFetch());
+      const body = (await (await suggest(createApp(buildDeps()), "regionid=13&band=low")).json()) as Suggestion & {
+        withinBand?: boolean;
+      };
+      expect(body.start).toBe("2026-01-01T01:30:00.000Z");
+      expect(body.withinBand).toBe(false);
+    });
+
+    it("rejects a band that isn't low, moderate or high", async () => {
+      vi.stubGlobal("fetch", routedFetch());
+      const app = createApp(buildDeps());
+      for (const value of ["very-high", "unknown", "x"]) {
+        expect((await suggest(app, `regionid=13&band=${value}`)).status, value).toBe(400);
+      }
+    });
+
+    it("never starts in the past when the best window is the period already under way", async () => {
+      at("2026-01-01T01:45:00Z");
+      vi.stubGlobal("fetch", routedFetch());
+      const body = (await (await suggest(createApp(buildDeps()), "regionid=13")).json()) as Suggestion;
+      expect(body.start).toBe("2026-01-01T01:45:00.000Z");
+      expect(body.end).toBe("2026-01-01T02:00:00.000Z");
+    });
+
+    it("limits the search to windows that start within the given minutes", async () => {
+      at("2026-01-01T00:10:00Z");
+      vi.stubGlobal("fetch", routedFetch());
+      const app = createApp(buildDeps());
+      // Starts up to 01:10 are allowed, so the 30 gCO2eq/kWh period at 01:30 is out of reach.
+      const limited = (await (await suggest(app, "regionid=13&within=60")).json()) as Suggestion;
+      expect(limited.start).toBe("2026-01-01T00:30:00.000Z");
+      expect(limited.averageIntensity).toBe(40);
+      const open = (await (await suggest(app, "regionid=13")).json()) as Suggestion;
+      expect(open.start).toBe("2026-01-01T01:30:00.000Z");
+    });
+
+    it("skips periods that ended before now, even in a cached forecast", async () => {
+      const fetchMock = routedFetch();
+      vi.stubGlobal("fetch", fetchMock);
+      const app = createApp(buildDeps());
+      at("2026-01-01T00:00:00Z");
+      await suggest(app, "regionid=13&duration=30");
+      // 00:30 is the cleanest period left once the clock reaches 00:20, but it has not started yet.
+      at("2026-01-01T01:10:00Z");
+      const body = (await (await suggest(app, "regionid=13&duration=30&within=10")).json()) as Suggestion;
+      // Within 10 minutes of 01:10 only the 01:00 period qualifies: 00:00 and 00:30 are over.
+      expect(body.start).toBe("2026-01-01T01:10:00.000Z");
+      expect(body.averageIntensity).toBe(60);
+    });
+
+    it("shares one upstream forecast between requests that differ only in duration and within", async () => {
+      at("2026-01-01T00:00:00Z");
+      const fetchMock = routedFetch();
+      vi.stubGlobal("fetch", fetchMock);
+      const app = createApp(buildDeps());
+      await suggest(app, "regionid=13&duration=30");
+      const callsAfterFirst = fetchMock.mock.calls.length;
+      await suggest(app, "regionid=13&duration=90&within=120");
+      expect(callsAfterFirst).toBeGreaterThan(0);
+      expect(fetchMock.mock.calls).toHaveLength(callsAfterFirst);
+    });
+
+    describe("outside Great Britain", () => {
+      const forecast = (entries: [string, number][]) =>
+        vi.fn(async () =>
+          new Response(
+            JSON.stringify({
+              zone: "FR",
+              forecast: entries.map(([datetime, carbonIntensity]) => ({ datetime, carbonIntensity })),
+            }),
+            { status: 200 },
+          ),
+        );
+      const hourly: [string, number][] = [
+        ["2026-01-01T00:00:00.000Z", 100],
+        ["2026-01-01T01:00:00.000Z", 50],
+        ["2026-01-01T02:00:00.000Z", 200],
+        ["2026-01-01T03:00:00.000Z", 80],
+      ];
+
+      it("suggests a window from the Electricity Maps forecast", async () => {
+        at("2026-01-01T00:10:00Z");
+        vi.stubGlobal("fetch", forecast(hourly));
+        const res = await suggest(createApp(buildDeps()), "zone=FR&duration=60");
+        expect(res.status).toBe(200);
+        expect((await res.json()) as Suggestion).toEqual({
+          start: "2026-01-01T01:00:00.000Z",
+          end: "2026-01-01T02:00:00.000Z",
+          averageIntensity: 50,
+          unit: "gCO2eq/kWh",
+          durationMinutes: 60,
+          attribution: [expect.objectContaining({ source: "electricitymaps" })],
+        });
+      });
+
+      it("rounds the job up to whole forecast periods, which are an hour long here", async () => {
+        at("2026-01-01T00:10:00Z");
+        vi.stubGlobal("fetch", forecast(hourly));
+        const body = (await (await suggest(createApp(buildDeps()), "zone=FR&duration=90")).json()) as Suggestion;
+        // Two hours: 100 + 50 beats 50 + 200 and 200 + 80. It starts in the hour already under way.
+        expect(body.start).toBe("2026-01-01T00:10:00.000Z");
+        expect(body.end).toBe("2026-01-01T02:00:00.000Z");
+        expect(body.averageIntensity).toBe(75);
+      });
+
+      it("returns the current time, with a reason, when there is no forecast to use", async () => {
+        at("2026-01-01T00:00:00Z");
+        vi.stubGlobal("fetch", routedFetch());
+        const res = await suggest(createApp(buildDeps({ electricityMapsToken: undefined })), "zone=FR");
+        const body = (await res.json()) as Suggestion;
+        expect(body.start).toBe("2026-01-01T00:00:00.000Z");
+        expect(body.end).toBeUndefined();
+        expect(body.fallback?.reason).toBeTruthy();
+      });
+    });
+
+    it("rejects a duration that isn't 1 to 2880 whole minutes", async () => {
+      vi.stubGlobal("fetch", routedFetch());
+      const app = createApp(buildDeps());
+      for (const value of ["0", "2881", "1.5", "abc"]) {
+        expect((await suggest(app, `regionid=13&duration=${value}`)).status, value).toBe(400);
+      }
+    });
+
+    it("needs an allowed origin", async () => {
+      vi.stubGlobal("fetch", routedFetch());
+      const res = await createApp(buildDeps()).request("/v2/suggest?regionid=13");
+      expect(res.status).toBe(403);
     });
   });
 

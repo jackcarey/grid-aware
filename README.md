@@ -71,6 +71,37 @@ data are cached for an hour. If either source is down, the fields based on it ar
 | `window` | Up to 48 hours | Lowest average carbon intensity period that fits the job, from NESO's half-hourly forecast for the region (or GB). Earliest wins in there is a tie and `from` may be the current half-hour. |
 | `day` | 2-14 days | The day with `dayRank` 1. |
 
+#### `/v2/suggest`
+
+Returns just the start time of the best window, for scheduling compute.
+
+```
+GET /v2/suggest?regionid=13&duration=90
+```
+
+```json
+{
+  "start": "2026-10-25T13:00:00.000Z",
+  "end": "2026-10-25T14:30:00.000Z",
+  "averageIntensity": 95,
+  "unit": "gCO2eq/kWh",
+  "durationMinutes": 90,
+  "attribution": [{ "source": "neso", "...": "..." }]
+}
+```
+
+| Parameter | |
+| --- | --- |
+| `zone`, `postcode`, `regionid` | Location, as for `/v2/intensity`. |
+| `duration` | Job length in minutes, 1 to 2880. Default 30. |
+| `within` | Latest the job may start, in minutes from now, 1 to 2880. Default: anywhere in the next 48 hours. |
+| `band` | `low`, `moderate` or `high`. Return the earliest window in which every period is at or below it, instead of the cleanest. If there is none, the cleanest window is returned and `withinBand` is `false`. |
+
+Works for every zone: GB from NESO's half-hourly forecast, elsewhere from Electricity Maps' hourly
+forecast, so `duration` is rounded up to whole periods of that length. `start` is never earlier than
+now. It is the current time, with a `fallback.reason`, when no window can be worked out, such as
+when the forecast is unavailable. It picks windows the same way as `derived.suggested.window`.
+
 #### Day ranking
 
 Days are scored by:

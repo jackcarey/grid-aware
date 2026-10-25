@@ -49,7 +49,7 @@ import type {
   SourcePreference,
 } from "../types.js";
 
-const QuerySchema = z.object({
+export const QuerySchema = z.object({
   zone: z.string().optional().openapi({
     example: "FR",
     description:
@@ -301,7 +301,7 @@ function unknownIntensityResponse(
   };
 }
 
-const errorResponses = {
+export const errorResponses = {
   400: {
     content: { "application/json": { schema: ErrorResponseSchema } },
     description: "Missing or invalid query parameters",
@@ -337,11 +337,22 @@ export function registerIntensityRoute(app: OpenAPIHono<AppEnv>): void {
   app.openapi(route, async (c) => (await handleIntensity(c, c.req.valid("query"), withAttribution)) as never);
 }
 
-/** Serves an intensity request, shaping the body with `present`. */
-async function handleIntensity(
+function withoutParams(rawUrl: string, names: readonly string[]): string {
+  const url = new URL(rawUrl);
+  for (const name of names) url.searchParams.delete(name);
+  return url.toString();
+}
+
+/**
+ * Serves an intensity request, shaping the body with `present`. With `cacheRawBody` the cache holds
+ * the unshaped body, and `present` runs on every request, for output that depends on the time or on
+ * parameters that shouldn't split the cache.
+ */
+export async function handleIntensity(
   c: Context<AppEnv>,
   query: IntensityQuery,
   present: (body: IntensityBody) => object,
+  { cacheRawBody = false }: { cacheRawBody?: boolean } = {},
 ): Promise<Response> {
   const { zone, postcode, regionid, horizon, source, surplus } = query;
   const deps = c.get("deps");
@@ -377,15 +388,17 @@ async function handleIntensity(
     isUk,
   });
 
+  // With the raw body cached, duration and within only shape the answer, so they mustn't split the cache.
+  const keyUrl = cacheRawBody ? withoutParams(c.req.url, ["duration", "within", "band"]) : c.req.url;
   // The auto-detected case must not share a cache entry across different
-  // visitors, since c.req.url is identical for all of them.
+  // visitors, since the URL is identical for all of them.
   const cacheKey = hasExplicitSubject
-    ? c.req.url
+    ? keyUrl
     : detectedPostcode
-      ? `${c.req.url}#postcode=${detectedPostcode}`
+      ? `${keyUrl}#postcode=${detectedPostcode}`
       : detectedRegionId !== undefined
-        ? `${c.req.url}#regionid=${detectedRegionId}`
-        : `${c.req.url}#country=${country ?? "unknown"}`;
+        ? `${keyUrl}#regionid=${detectedRegionId}`
+        : `${keyUrl}#country=${country ?? "unknown"}`;
 
   const cacheTtlSeconds =
     target.kind === "electricitymaps"
@@ -431,9 +444,10 @@ async function handleIntensity(
           const forecast48h = horizon === "48h" ? body.forecast : await next48h;
           body = withSurplus(body, await dayData, forecast48h, jobMinutes);
         }
-        return c.json(present(body), 200);
+        return c.json(cacheRawBody ? body : present(body), 200);
       },
     );
+    if (cacheRawBody) response = c.json(present((await response.json()) as IntensityBody), 200);
   } catch (err) {
     // Caller-caused errors (bad config, forbidden) stay as errors; only upstream
     // failure falls back, and throwing before withEdgeCache resolves keeps it uncached.

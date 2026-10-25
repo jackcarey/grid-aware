@@ -227,6 +227,34 @@ export const GridIntensityResponseSchema = z
   })
   .openapi("GridIntensityResponse");
 
+export const SuggestionResponseSchema = z
+  .object({
+    start: z.string().openapi({
+      example: "2026-10-25T13:00:00.000Z",
+      description: "When to start the job, ISO 8601 UTC. The current time when no better time is known.",
+    }),
+    end: z.string().optional().openapi({
+      example: "2026-10-25T14:00:00.000Z",
+      description: "End of the suggested window. Absent when `start` is the current time and there is no window.",
+    }),
+    averageIntensity: z.number().optional().openapi({
+      example: 95,
+      description: "Average carbon intensity over the window, in `unit`.",
+    }),
+    unit: z.literal("gCO2eq/kWh"),
+    durationMinutes: z.number().openapi({ description: "The job length the window was sized for." }),
+    withinBand: z.boolean().optional().openapi({
+      description:
+        "Only present when `band` was asked for. True if every period in the window is at or below that band; false if none was, and the window is the cleanest one instead.",
+    }),
+    attribution: AttributionListSchema,
+    fallback: z.object({ reason: z.string() }).optional().openapi({
+      description:
+        "Present when `start` is the current time because no window could be worked out, such as when the forecast was unavailable.",
+    }),
+  })
+  .openapi("SuggestionResponse");
+
 const ZoneMapSchema = z.record(
   z.string(),
   z.object({
