@@ -18,6 +18,7 @@ _version numbers are synced across packages_
   [`grid-intensity`](https://developers.thegreenwebfoundation.org/grid-intensity-cli/commands/) CLI and adds GB DNO regions.
 - [`integrations/docker-plugin/`](integrations/docker-plugin) - a Drone-style CI plugin image that reports the best
   time to start, and includes the gate.
+- [`integrations/harness/`](integrations/harness) - a Harness step template that uses the Docker plugin.
 - [`integrations/gate/`](integrations/gate) - a shell script that runs deferrable work at the cleanest time
   before its deadline, using `/v2/suggest`. It never sleeps, so it suits cron and CI ticks.
 

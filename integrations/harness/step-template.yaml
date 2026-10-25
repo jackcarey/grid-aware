@@ -1,0 +1,32 @@
+template:
+  name: Grid Aware Schedule
+  identifier: grid_aware_schedule
+  versionLabel: "2.1.0"
+  type: Step
+  tags: {}
+  spec:
+    type: Plugin
+    timeout: 1m
+    spec:
+      # Your Docker connector, and the image built from integrations/docker-plugin.
+      connectorRef: <+input>
+      image: your-registry/grid-aware-plugin:2.1.0
+      settings:
+        api_url: <+input>
+        origin: <+input>
+        zone: ""
+        postcode: ""
+        regionid: ""
+        duration_minutes: "30"
+        max_wait_minutes: "360"
+        max_band: ""
+      outputVariables:
+        - name: GRID_AWARE_START
+          type: String
+          value: GRID_AWARE_START
+        - name: GRID_AWARE_DELAY_SECONDS
+          type: String
+          value: GRID_AWARE_DELAY_SECONDS
+        - name: GRID_AWARE_DIRTY
+          type: String
+          value: GRID_AWARE_DIRTY
