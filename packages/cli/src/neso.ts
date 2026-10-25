@@ -5,65 +5,68 @@ import {
   getRegionalByPostcode,
   getRegionalByRegionId,
   getRegionalNational,
+  type NesoRegion,
+  type NesoRegionalResponse,
 } from "../../../worker/src/providers/neso.js";
-import type { GridIntensityResponse, IntensityBody } from "../../../worker/src/types.js";
+import type { GridIntensityResponse } from "../../../worker/src/types.js";
 
+/** Separate from upstream failures so the CLI can exit 2 for bad input and 1 for a failed request. */
 export class BadLocationError extends Error {}
 
+/** Options for {@link queryNeso}. */
 export interface NesoOptions {
-  /** Job length in minutes. When set, the response carries the best window in the next 48 hours. */
+  /** Job length. Setting it adds the best window in the next 48 hours. */
   windowMinutes?: number;
 }
 
-const OUTWARD = /^[A-Z]{1,2}\d[A-Z\d]?$/;
-const FULL_POSTCODE = /^([A-Z]{1,2}\d[A-Z\d]?)\d[A-Z]{2}$/;
+/** NESO only takes the outward part, so a full postcode is cut down to it. */
+const POSTCODE = /^([A-Z]{1,2}\d[A-Z\d]?)(?:\s*\d[A-Z]{2})?$/;
 
-/** Gets NESO intensity for GB, a DNO region id (1-14), a region name, or a postcode. */
-export async function queryNeso(location: string, options: NesoOptions = {}): Promise<GridIntensityResponse> {
-  const { windowMinutes } = options;
-  // The window is picked from the half-hourly forecast, so it needs the 48h series.
-  const horizon = windowMinutes === undefined ? "latest" : "48h";
-  const input = location.trim();
-  const upper = input.toUpperCase();
-  const gb = { zone: "GB", region: { unknown: true } };
+/** The single-region endpoints still return a list, which is empty for a postcode NESO doesn't know. */
+function onlyRegion({ data }: NesoRegionalResponse, location: string): NesoRegion {
+  const [region] = data;
+  if (!region) throw new BadLocationError(`No data for ${location}`);
+  return region;
+}
 
-  if (upper === "GB") {
-    const { data } = await getNationalIntensity(horizon);
-    return finish(normalizeNesoNational(data, gb), windowMinutes);
-  }
-
+/** A number is a region id, anything else with a digit is a postcode, and the rest is a region name. */
+async function findRegion(input: string, horizon: "latest" | "48h"): Promise<NesoRegion> {
   if (/^\d+$/.test(input)) {
     const id = Number(input);
     if (id < 1 || id > 14) throw new BadLocationError(`Region id must be 1-14, got ${input}`);
-    const [first] = (await getRegionalByRegionId(id, horizon)).data;
-    if (!first) throw new BadLocationError(`No data for region ${id}`);
-    return finish(normalizeNesoRegional(first, gb), windowMinutes);
+    return onlyRegion(await getRegionalByRegionId(id, horizon), input);
   }
 
   if (/\d/.test(input)) {
-    // Full postcodes are cut to the outward code NESO expects.
-    const compact = upper.replace(/\s+/g, "");
-    const outward = upper.includes(" ") ? (upper.split(/\s+/)[0] ?? upper) : (FULL_POSTCODE.exec(compact)?.[1] ?? compact);
-    if (!OUTWARD.test(outward)) throw new BadLocationError(`Unrecognised location: ${input}`);
-    const [first] = (await getRegionalByPostcode(outward, horizon)).data;
-    if (!first) throw new BadLocationError(`No region found for postcode ${outward}`);
-    return finish(normalizeNesoRegional(first, gb), windowMinutes);
+    const outward = POSTCODE.exec(input.toUpperCase())?.[1];
+    if (!outward) throw new BadLocationError(`Unrecognised location: ${input}`);
+    return onlyRegion(await getRegionalByPostcode(outward, horizon), outward);
   }
 
   const { data } = await getRegionalNational(horizon);
-  const wanted = input.toLowerCase();
-  const match = data.find((r) => r.shortname.toLowerCase() === wanted || r.dnoregion.toLowerCase() === wanted);
+  const name = input.toLowerCase();
+  const match = data.find((r) => r.shortname.toLowerCase() === name || r.dnoregion.toLowerCase() === name);
   if (!match) {
     const names = data.map((r) => `${r.regionid} ${r.shortname}`).join(", ");
     throw new BadLocationError(`Unknown region "${input}". Regions: ${names}`);
   }
-  return finish(normalizeNesoRegional(match, gb), windowMinutes);
+  return match;
 }
 
-/** Adds the suggested window when asked for. The 48h series it came from isn't part of the output. */
-function finish(body: IntensityBody, windowMinutes: number | undefined): GridIntensityResponse {
-  if (windowMinutes === undefined) return withAttribution(body);
-  const { forecast, ...rest } = body;
+/** Returns the same shape as the `/v2/intensity` API. `location` is GB, a region id (1-14), a region name or a postcode. */
+export async function queryNeso(location: string, { windowMinutes }: NesoOptions = {}): Promise<GridIntensityResponse> {
+  // The window is chosen from the half-hourly forecast, which only the 48h request returns.
+  const horizon = windowMinutes === undefined ? "latest" : "48h";
+  const input = location.trim();
+  const gb = { zone: "GB", region: { unknown: true } };
+
+  const { forecast, ...body } =
+    input.toUpperCase() === "GB"
+      ? normalizeNesoNational((await getNationalIntensity(horizon)).data, gb)
+      : normalizeNesoRegional(await findRegion(input, horizon), gb);
+  if (windowMinutes === undefined) return withAttribution({ ...body, forecast });
+
+  // The series was only needed to pick the window, so it isn't printed.
   const surplus = buildSurplus({ demand: [], next48h: forecast, durationMinutes: windowMinutes });
-  return withAttribution(surplus ? { ...rest, surplus } : rest);
+  return withAttribution(surplus ? { ...body, surplus } : body);
 }

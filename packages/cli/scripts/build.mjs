@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 
-// Bundled because the worker providers it reuses import each other with .js specifiers that Node can't resolve from TS.
+// Bundled because JSR can't publish the worker code this imports from outside the package folder.
 await build({
   entryPoints: ["src/cli.ts"],
   bundle: true,

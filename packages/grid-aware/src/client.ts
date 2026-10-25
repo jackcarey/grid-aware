@@ -5,7 +5,7 @@ import type { components, paths } from "./client.gen.js";
 export type GridIntensityData = components["schemas"]["GridIntensityResponse"];
 export type ForecastHorizon = "24h" | "48h";
 type Surplus = NonNullable<GridIntensityData["surplus"]>;
-/** The best time in the next 48 hours to run a job of a given length. GB only. */
+/** GB only, since it comes from NESO's forecast. */
 export type SuggestedWindow = NonNullable<
   NonNullable<NonNullable<Surplus["derived"]>["suggested"]>["window"]
 >;
@@ -26,10 +26,7 @@ export interface GridAwareClient {
   getCurrentIntensity(query?: IntensityQuery): Promise<GridIntensityData>;
   /** Same response shape, but with `forecast` populated for the requested window. Default: `"24h"`. */
   getForecast(query?: IntensityQuery & { horizon?: ForecastHorizon }): Promise<GridIntensityData>;
-  /**
-   * The lowest-carbon time in the next 48 hours to run a job of `durationMinutes` (default 30).
-   * Undefined outside GB, or when no window could be worked out.
-   */
+  /** Undefined outside GB, or when the forecast is unavailable. `durationMinutes` defaults to 30. */
   getSuggestedWindow(
     query?: Omit<IntensityQuery, "surplus"> & { durationMinutes?: number },
   ): Promise<SuggestedWindow | undefined>;
@@ -57,7 +54,7 @@ export function createGridAwareClient(baseUrl: string): GridAwareClient {
   return {
     getCurrentIntensity: (query = {}) => fetchIntensity({ ...query, horizon: "latest" }),
     getForecast: ({ horizon = "24h", ...query } = {}) => fetchIntensity({ ...query, horizon }),
-    // The worker fetches the 48h series itself, so the cheap "latest" request is enough.
+    // The worker adds the window from its own 48h fetch, so the cheaper "latest" request is enough.
     getSuggestedWindow: async ({ durationMinutes, ...query } = {}) => {
       const data = await fetchIntensity({ ...query, horizon: "latest", surplus: durationMinutes ?? true });
       return data.surplus?.derived?.suggested?.window;
